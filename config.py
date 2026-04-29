@@ -120,6 +120,11 @@ LOOKBACK_DAYS: dict[str, int] = {
     "M": 365,
 }
 
+# --- Tradable Universe (nsepython) ---
+UNIVERSE_MAX_PRICE: float = 500.0       # upper LTP bound (₹)
+UNIVERSE_MIN_VOLUME: int = 500_000      # minimum daily traded volume
+UNIVERSE_CACHE_FILE = Path("~/.trader_zex_universe.json").expanduser()
+
 # --- Structure Detector Configuration ---
 STRUCTURE_METHOD = "atr"  # "atr" (Keltner bands) or "pivot" (swing highs/lows)
 STRUCTURE_ATR_PERIOD = 14  # ATR lookback period

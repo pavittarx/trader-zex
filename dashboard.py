@@ -158,13 +158,13 @@ def _make_results_fragment(run_every: int | None):
         )
 
         st.subheader("HMM Regime")
-        st.dataframe(_style_regime(res["regimes"]), use_container_width=True)
+        st.dataframe(_style_regime(res["regimes"]), width="stretch")
         st.caption("▲ Bullish  |  — Sideways  |  ▼ Bearish  |  ✕ Error")
 
         st.divider()
 
         st.subheader("Confluence Signals")
-        st.dataframe(_style_signals(res["signals"]), use_container_width=True)
+        st.dataframe(_style_signals(res["signals"]), width="stretch")
         st.caption(
             "★ STRONG BUY/SELL  |  ↑ WEAK BUY  |  ⊙ TAKE PROFIT  |  "
             "◎ WATCH  |  · NEUTRAL  |  ⏸ WAIT  |  ✕ AVOID"
@@ -174,7 +174,7 @@ def _make_results_fragment(run_every: int | None):
 
         ref_tf = res["timeframes"][-1]
         st.subheader(f"Price Levels  (ref: {ref_tf} timeframe)")
-        st.dataframe(_style_levels(res["levels"]), use_container_width=True)
+        st.dataframe(_style_levels(res["levels"]), width="stretch")
 
     return _results_fragment
 
@@ -235,7 +235,7 @@ def main() -> None:
         st.divider()
 
         # --- Manual run ---
-        run_btn = st.button("▶  Run Screener", type="primary", use_container_width=True)
+        run_btn = st.button("▶  Run Screener", type="primary", width="stretch")
 
         # --- Auto-refresh ---
         st.subheader("Auto-refresh")
@@ -249,14 +249,14 @@ def main() -> None:
         interval_sec = interval_options[interval_label]
 
         if auto_refresh:
-            if st.button("⏹  Stop Auto-refresh", use_container_width=True):
+            if st.button("⏹  Stop Auto-refresh", width="stretch"):
                 st.session_state.auto_refresh = False
                 st.rerun()
             st.success(f"Refreshing every {interval_label}")
             last = st.session_state.get("results", {}).get("updated_at", "—")
             st.caption(f"Last run: {last}")
         else:
-            if st.button("🔄  Start Auto-refresh", use_container_width=True):
+            if st.button("🔄  Start Auto-refresh", width="stretch"):
                 if not symbols or not timeframes:
                     st.error("Select symbols and timeframes first.")
                 else:
@@ -266,7 +266,7 @@ def main() -> None:
                     st.rerun()
 
         st.divider()
-        if st.button("🔒 Re-authenticate", use_container_width=True):
+        if st.button("🔒 Re-authenticate", width="stretch"):
             for key in ("access_token", "results", "auto_refresh", "run_settings"):
                 st.session_state.pop(key, None)
             st.rerun()

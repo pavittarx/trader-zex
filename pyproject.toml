@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fyers-apiv3>=3.0.0",
     "hmmlearn>=0.3.0",
+    "nsepython>=2.97",
     "numpy>=1.24.0",
     "pandas>=2.0.0",
     "python-dotenv>=1.2.2",
@@ -15,3 +16,14 @@ dependencies = [
     "scipy>=1.11.0",
     "streamlit>=1.57.0",
 ]
+
+[dependency-groups]
+dev = [
+    "poethepoet>=0.45.0",
+]
+
+[tool.poe.tasks]
+screen    = "python main.py"
+universe  = "python main.py --universe"
+dashboard = "streamlit run dashboard.py"
+auth      = "python auth.py"

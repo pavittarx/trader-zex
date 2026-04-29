@@ -13,6 +13,7 @@ import logging
 import config
 from fyers_client import FyersClient
 from screener import Screener
+from universe import get_tradable_universe
 
 logging.basicConfig(
     level=logging.INFO,
@@ -80,11 +81,25 @@ def parse_args() -> argparse.Namespace:
         metavar="TF",
         help='Timeframes to screen, e.g. "5 15 60 D" (default: config.DEFAULT_TIMEFRAMES)',
     )
+    parser.add_argument(
+        "--universe",
+        action="store_true",
+        help="Use Nifty 500 tradable universe (filters from config.py, cached daily)",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+
+    if args.universe:
+        symbols = get_tradable_universe()
+        if not symbols:
+            log.error("Universe filter returned no symbols — aborting.")
+            return
+        args.symbols = symbols
+        log.info("Universe mode: screening %d symbols", len(symbols))
+
     client = FyersClient()
     run_screener(args, client)
 
