@@ -28,36 +28,36 @@ HMM_MIN_SAMPLES = 100
 DEFAULT_SYMBOLS = [
     # Large-cap / Nifty 50
     "NSE:RELIANCE-EQ",
-    "NSE:TCS-EQ",
-    "NSE:INFY-EQ",
-    "NSE:HDFCBANK-EQ",
-    "NSE:ICICIBANK-EQ",
-    "NSE:HINDUNILVR-EQ",
-    "NSE:SBIN-EQ",
-    "NSE:BHARTIARTL-EQ",
-    "NSE:KOTAKBANK-EQ",
-    "NSE:ITC-EQ",
-    "NSE:LT-EQ",
-    "NSE:AXISBANK-EQ",
-    "NSE:BAJFINANCE-EQ",
-    "NSE:ASIANPAINT-EQ",
-    "NSE:MARUTI-EQ",
-    "NSE:WIPRO-EQ",
-    "NSE:HCLTECH-EQ",
-    "NSE:SUNPHARMA-EQ",
-    "NSE:TITAN-EQ",
-    "NSE:ULTRACEMCO-EQ",
+    # "NSE:TCS-EQ",
+    # "NSE:INFY-EQ",
+    # "NSE:HDFCBANK-EQ",
+    # "NSE:ICICIBANK-EQ",
+    # "NSE:HINDUNILVR-EQ",
+    # "NSE:SBIN-EQ",
+    # "NSE:BHARTIARTL-EQ",
+    # "NSE:KOTAKBANK-EQ",
+    # "NSE:ITC-EQ",
+    # "NSE:LT-EQ",
+    # "NSE:AXISBANK-EQ",
+    # "NSE:BAJFINANCE-EQ",
+    # "NSE:ASIANPAINT-EQ",
+    # "NSE:MARUTI-EQ",
+    # "NSE:WIPRO-EQ",
+    # "NSE:HCLTECH-EQ",
+    # "NSE:SUNPHARMA-EQ",
+    # "NSE:TITAN-EQ",
+    # "NSE:ULTRACEMCO-EQ",
     # Mid-cap / sector picks
-    "NSE:TATAMOTORS-EQ",
-    "NSE:TATASTEEL-EQ",
-    "NSE:JSWSTEEL-EQ",
-    "NSE:ADANIENT-EQ",
-    "NSE:ADANIPORTS-EQ",
-    "NSE:NTPC-EQ",
-    "NSE:POWERGRID-EQ",
-    "NSE:ONGC-EQ",
-    "NSE:TECHM-EQ",
-    "NSE:BAJAJFINSV-EQ",
+    # "NSE:TATAMOTORS-EQ",
+    # "NSE:TATASTEEL-EQ",
+    # "NSE:JSWSTEEL-EQ",
+    # "NSE:ADANIENT-EQ",
+    # "NSE:ADANIPORTS-EQ",
+    # "NSE:NTPC-EQ",
+    # "NSE:POWERGRID-EQ",
+    # "NSE:ONGC-EQ",
+    # "NSE:TECHM-EQ",
+    # "NSE:BAJAJFINSV-EQ",
 ]
 
 DEFAULT_TIMEFRAMES = ["5", "15", "60", "D"]
@@ -87,10 +87,10 @@ LOOKBACK_DAYS: dict[str, int] = {
     "M": 365,
 }
 
-# --- Regime Color Map (for visualization) ---
-REGIME_COLORS = {
-    "Bullish": "#26a69a",   # teal-green
-    "Sideways": "#ffa726",  # amber
-    "Bearish": "#ef5350",   # red
-    "Unknown": "#9e9e9e",   # grey  (fallback)
-}
+# --- Structure Detector Configuration ---
+STRUCTURE_METHOD = "atr"  # "atr" (Keltner bands) or "pivot" (swing highs/lows)
+STRUCTURE_ATR_PERIOD = 14  # ATR lookback period
+STRUCTURE_EMA_PERIOD = 20  # EMA period for band midline
+STRUCTURE_ATR_MULT = 2.0  # band width = EMA ± multiplier × ATR
+STRUCTURE_PROXIMITY_PCT = 2.0  # % distance to consider "at" a level
+STRUCTURE_PIVOT_DISTANCE = 5  # min bars between pivots (scipy find_peaks)

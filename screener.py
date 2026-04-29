@@ -1,5 +1,6 @@
 """
-Screener — runs the HMM regime detector across multiple symbols and timeframes.
+Screener — runs HMM regime detection + structural analysis across
+multiple symbols and timeframes, then produces a confluence signal table.
 
 API call strategy
 -----------------
@@ -13,6 +14,7 @@ N×T  to  N×2 (or N×1 when only intraday or only EOD is requested).
 
 import logging
 import time
+from dataclasses import dataclass
 
 import pandas as pd
 
@@ -25,30 +27,45 @@ from fyers_client import (
     resample_ohlcv,
 )
 from hmm_model import HMMModel
+from confluence import generate_signal, format_signal
+from structure import StructureDetector, StructureResult
 
 log = logging.getLogger(__name__)
 
 _REGIME_ICONS = {
-    "Bullish":  "▲ Bullish",
+    "Bullish": "▲ Bullish",
     "Sideways": "— Sideways",
-    "Bearish":  "▼ Bearish",
-    "Error":    "✕ Error",
+    "Bearish": "▼ Bearish",
+    "Error": "✕ Error",
 }
+
+
+@dataclass
+class BarAnalysis:
+    regime: str
+    signal: str
+    support: float
+    resistance: float
+    support_dist_pct: float
+    resistance_dist_pct: float
+    location: str
 
 
 class Screener:
     """
-    Multi-symbol, multi-timeframe regime screener.
+    Multi-symbol, multi-timeframe regime + confluence screener.
 
     Usage
     -----
     >>> client = FyersClient()
-    >>> table = Screener(client).run()
-    >>> print(table)
+    >>> regimes, signals, levels = Screener(client).run()
+    >>> print(regimes)
+    >>> print(signals)
     """
 
     def __init__(self, client: FyersClient) -> None:
         self._client = client
+        self._structure = StructureDetector()
 
     def run(
         self,
@@ -56,53 +73,93 @@ class Screener:
         timeframes: list[str] = config.DEFAULT_TIMEFRAMES,
         *,
         sleep_sec: float = config.API_SLEEP_SECONDS,
-        show_icons: bool = True,
-    ) -> pd.DataFrame:
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
-        Screen *symbols* across *timeframes* and return a regime summary table.
+        Screen *symbols* across *timeframes*.
 
         Returns
         -------
-        pd.DataFrame  — index=symbol, columns=[Price, Chg%, *timeframes]
+        regimes : DataFrame — index=symbol, columns=[Price, Chg%, *timeframes], regime labels
+        signals : DataFrame — index=symbol, columns=timeframes, confluence signal labels
+        levels  : DataFrame — index=symbol, columns=[Support, Resistance, Dist_S%, Dist_R%]
+                  (uses the last timeframe as reference for levels)
         """
         intraday_tfs = [tf for tf in timeframes if tf in INTRADAY_RESOLUTIONS]
-        eod_tfs      = [tf for tf in timeframes if tf in EOD_RESOLUTIONS]
+        eod_tfs = [tf for tf in timeframes if tf in EOD_RESOLUTIONS]
 
-        rows: dict[str, dict[str, str]] = {sym: {} for sym in symbols}
+        raw: dict[str, dict[str, BarAnalysis]] = {sym: {} for sym in symbols}
         total = len(symbols)
 
         for i, sym in enumerate(symbols, 1):
             log.info("[%d/%d]  %s", i, total, sym)
-            rows[sym] = self._detect_all_timeframes(sym, intraday_tfs, eod_tfs, sleep_sec)
-
-        df = pd.DataFrame(rows).T
-        df.index.name = "Symbol"
-        df.columns.name = "Timeframe"
-        df = df[timeframes]
-
-        if show_icons:
-            df = df.map(lambda v: _REGIME_ICONS.get(v, v))
+            raw[sym] = self._analyse_all_timeframes(
+                sym, intraday_tfs, eod_tfs, sleep_sec
+            )
 
         quotes = self._fetch_quotes(symbols)
-        df.insert(0, "Chg%",  quotes["change_pct"].map(self._fmt_change))
-        df.insert(0, "Price", quotes["ltp"].map(self._fmt_price))
 
-        return df
+        # --- Regime table ---
+        regime_data = {
+            sym: {tf: _REGIME_ICONS.get(a.regime, a.regime) for tf, a in tfs.items()}
+            for sym, tfs in raw.items()
+        }
+        regimes = pd.DataFrame(regime_data).T.reindex(columns=timeframes)
+        regimes.index.name = "Symbol"
+        regimes.insert(0, "Chg%", quotes["change_pct"].map(self._fmt_change))
+        regimes.insert(0, "Price", quotes["ltp"].map(self._fmt_price))
+
+        # --- Signal table ---
+        signal_data = {
+            sym: {tf: format_signal(a.signal) for tf, a in tfs.items()}
+            for sym, tfs in raw.items()
+        }
+        signals = pd.DataFrame(signal_data).T.reindex(columns=timeframes)
+        signals.index.name = "Symbol"
+
+        # --- Level table (reference: last timeframe) ---
+        ref_tf = timeframes[-1]
+        level_rows = []
+        for sym, tfs in raw.items():
+            a = tfs.get(ref_tf)
+            if a and a.regime != "Error":
+                level_rows.append(
+                    {
+                        "Symbol": sym,
+                        "Support": self._fmt_price(a.support),
+                        "Dist_S%": f"{a.support_dist_pct:.1f}%",
+                        "Resistance": self._fmt_price(a.resistance),
+                        "Dist_R%": f"{a.resistance_dist_pct:.1f}%",
+                        "Location": a.location,
+                    }
+                )
+            else:
+                level_rows.append(
+                    {
+                        "Symbol": sym,
+                        "Support": "—",
+                        "Dist_S%": "—",
+                        "Resistance": "—",
+                        "Dist_R%": "—",
+                        "Location": "—",
+                    }
+                )
+        levels = pd.DataFrame(level_rows).set_index("Symbol")
+
+        return regimes, signals, levels
 
     # ------------------------------------------------------------------
     # Per-symbol batching
     # ------------------------------------------------------------------
 
-    def _detect_all_timeframes(
+    def _analyse_all_timeframes(
         self,
         symbol: str,
         intraday_tfs: list[str],
         eod_tfs: list[str],
         sleep_sec: float,
-    ) -> dict[str, str]:
-        results: dict[str, str] = {}
+    ) -> dict[str, BarAnalysis]:
+        results: dict[str, BarAnalysis] = {}
 
-        # --- One 1-min fetch → resample to all intraday timeframes ---
         if intraday_tfs:
             try:
                 base = self._client.get_history(symbol, "1")
@@ -110,47 +167,69 @@ class Screener:
                     raise ValueError("empty response")
                 log.debug("  Fetched %d 1-min bars for %s", len(base), symbol)
                 for tf in intraday_tfs:
-                    rule = RESAMPLE_RULES[tf]
-                    resampled = resample_ohlcv(base, rule)
-                    log.debug("  %s @ %s → %d bars (resampled)", symbol, tf, len(resampled))
-                    results[tf] = self._run_hmm(resampled, symbol, tf)
+                    resampled = resample_ohlcv(base, RESAMPLE_RULES[tf])
+                    log.debug("  %s @ %s → %d bars", symbol, tf, len(resampled))
+                    results[tf] = self._analyse(resampled, symbol, tf)
             except Exception as exc:
                 log.error("%s intraday fetch failed: %s", symbol, exc)
                 for tf in intraday_tfs:
-                    results[tf] = "Error"
+                    results[tf] = self._error_analysis()
             time.sleep(sleep_sec)
 
-        # --- One fetch per EOD timeframe (different lookback periods) ---
         for tf in eod_tfs:
             try:
                 data = self._client.get_history(symbol, tf)
                 if data.empty:
                     raise ValueError("empty response")
-                results[tf] = self._run_hmm(data, symbol, tf)
+                results[tf] = self._analyse(data, symbol, tf)
             except Exception as exc:
                 log.error("%s @ %s failed: %s", symbol, tf, exc)
-                results[tf] = "Error"
+                results[tf] = self._error_analysis()
             time.sleep(sleep_sec)
 
         return results
 
-    def _run_hmm(self, data: pd.DataFrame, symbol: str, tf: str) -> str:
+    def _analyse(self, data: pd.DataFrame, symbol: str, tf: str) -> BarAnalysis:
         try:
-            result = HMMModel().detect_regime(data)
-            if not result.converged:
+            hmm_result = HMMModel().detect_regime(data)
+            if not hmm_result.converged:
                 log.warning("%s @ %s: HMM did not converge", symbol, tf)
-            return result.current_regime
+
+            struct: StructureResult = self._structure.detect(data)
+            sig = generate_signal(hmm_result.current_regime, struct.location)
+
+            return BarAnalysis(
+                regime=hmm_result.current_regime,
+                signal=sig,
+                support=struct.support,
+                resistance=struct.resistance,
+                support_dist_pct=struct.support_dist_pct,
+                resistance_dist_pct=struct.resistance_dist_pct,
+                location=struct.location,
+            )
         except Exception as exc:
-            log.error("%s @ %s HMM failed: %s", symbol, tf, exc)
-            return "Error"
+            log.error("%s @ %s analysis failed: %s", symbol, tf, exc)
+            return self._error_analysis()
+
+    @staticmethod
+    def _error_analysis() -> BarAnalysis:
+        return BarAnalysis(
+            regime="Error",
+            signal="NEUTRAL",
+            support=0.0,
+            resistance=0.0,
+            support_dist_pct=0.0,
+            resistance_dist_pct=0.0,
+            location="—",
+        )
 
     # ------------------------------------------------------------------
-    # Formatting helpers
+    # Helpers
     # ------------------------------------------------------------------
 
     @staticmethod
     def _fmt_price(val) -> str:
-        return f"₹{val:,.2f}" if pd.notna(val) else "—"
+        return f"₹{val:,.2f}" if pd.notna(val) and val else "—"
 
     @staticmethod
     def _fmt_change(val) -> str:
