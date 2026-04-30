@@ -14,7 +14,7 @@ dependencies = [
     "requests>=2.31.0",
     "scikit-learn>=1.3.0",
     "scipy>=1.11.0",
-    "streamlit>=1.57.0",
+    "reflex>=0.9.0",
 ]
 
 [dependency-groups]
@@ -25,5 +25,5 @@ dev = [
 [tool.poe.tasks]
 screen    = "python main.py"
 universe  = "python main.py --universe"
-dashboard = "streamlit run dashboard.py"
+dashboard = "reflex run"
 auth      = "python auth.py"

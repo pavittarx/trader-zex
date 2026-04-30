@@ -1,3 +1,8 @@
+*.py[cod]
+assets/external/
+*.db
+.web
+.states
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -12,3 +17,4 @@ wheels/
 # Secrets — never commit
 .env
 *.log
+.web/*
