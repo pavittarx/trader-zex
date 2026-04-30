@@ -26,22 +26,29 @@ def _to_fyers(symbol: str) -> str:
 
 
 def _load_cache() -> list[str] | None:
-    path = config.UNIVERSE_CACHE_FILE
-    if not path.exists():
-        return None
+    """Return cached symbols if written today, else None."""
     try:
-        data = json.loads(path.read_text())
-        if data.get("date") == str(date.today()):
+        data = json.loads(config.UNIVERSE_CACHE_FILE.read_text())
+        if data.get("date") == date.today().isoformat():
             return data["symbols"]
     except Exception as exc:
         log.debug("Cache read failed: %s", exc)
     return None
 
 
+def get_cached_symbols() -> list[str]:
+    """Return any cached universe (any date), used for populating UI option lists."""
+    try:
+        data = json.loads(config.UNIVERSE_CACHE_FILE.read_text())
+        return data.get("symbols", [])
+    except Exception:
+        return []
+
+
 def _save_cache(symbols: list[str]) -> None:
     path = config.UNIVERSE_CACHE_FILE
     try:
-        path.write_text(json.dumps({"date": str(date.today()), "symbols": symbols}))
+        path.write_text(json.dumps({"date": date.today().isoformat(), "symbols": symbols}))
         log.debug("Universe cached to %s", path)
     except Exception as exc:
         log.warning("Could not write universe cache: %s", exc)

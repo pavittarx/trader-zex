@@ -124,6 +124,7 @@ LOOKBACK_DAYS: dict[str, int] = {
 UNIVERSE_MAX_PRICE: float = 500.0       # upper LTP bound (₹)
 UNIVERSE_MIN_VOLUME: int = 500_000      # minimum daily traded volume
 UNIVERSE_CACHE_FILE = Path("~/.trader_zex_universe.json").expanduser()
+WATCHLIST_FILE = Path("~/.trader_zex_watchlist.json").expanduser()
 
 # --- Structure Detector Configuration ---
 STRUCTURE_METHOD = "atr"  # "atr" (Keltner bands) or "pivot" (swing highs/lows)
