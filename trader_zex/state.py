@@ -40,33 +40,44 @@ def _build_result_rows(
     for sym in regimes.index:
         label = sym.replace("NSE:", "").replace("-EQ", "")
         price = str(regimes.at[sym, "Price"]) if "Price" in regimes.columns else "—"
-        chg   = str(regimes.at[sym, "Chg%"])  if "Chg%"  in regimes.columns else "—"
+        chg = str(regimes.at[sym, "Chg%"]) if "Chg%" in regimes.columns else "—"
         chg_up = "true" if chg.startswith("▲") else "false"
 
         def lv(col: str) -> str:
-            return str(levels.at[sym, col]) if sym in levels.index and col in levels.columns else "—"
+            return (
+                str(levels.at[sym, col])
+                if sym in levels.index and col in levels.columns
+                else "—"
+            )
 
-        loc     = lv("Location")
+        loc = lv("Location")
         loc_cls = _LOCATION_CLASS.get(loc.strip(), "")
 
         dt = symbol_times.get(sym)
         fetched, fetched_cls = fmt_age(dt) if dt else ("—", "age-none")
 
         row: dict[str, str] = {
-            "sym": sym, "label": label,
-            "price": price, "chg": chg, "chg_up": chg_up,
-            "support": lv("Support"), "dist_s": lv("Dist_S%"),
-            "resistance": lv("Resistance"), "dist_r": lv("Dist_R%"),
-            "location": loc, "loc_cls": loc_cls,
-            "fetched": fetched, "fetched_cls": fetched_cls,
+            "sym": sym,
+            "label": label,
+            "price": price,
+            "chg": chg,
+            "chg_up": chg_up,
+            "support": lv("Support"),
+            "dist_s": lv("Dist_S%"),
+            "resistance": lv("Resistance"),
+            "dist_r": lv("Dist_R%"),
+            "location": loc,
+            "loc_cls": loc_cls,
+            "fetched": fetched,
+            "fetched_cls": fetched_cls,
         }
 
         for i, tf in enumerate(tfs):
             regime = str(regimes.at[sym, tf]) if tf in regimes.columns else "✕ Error"
             signal = str(signals.at[sym, tf]) if tf in signals.columns else "· NEUTRAL"
-            row[f"r{i}"]  = regime
+            row[f"r{i}"] = regime
             row[f"rc{i}"] = _REGIME_CLASS.get(regime.strip(), "error")
-            row[f"s{i}"]  = signal
+            row[f"s{i}"] = signal
             row[f"sc{i}"] = _SIGNAL_CLASS.get(signal.strip(), "neutral")
 
         rows.append(row)
@@ -105,7 +116,7 @@ class AppState(rx.State):
     total: int = 0
     status_text: str = ""
     updated_at: str = ""
-    symbol_times: dict[str, str] = {}       # sym → ISO datetime string
+    symbol_times: dict[str, str] = {}  # sym → ISO datetime string
     # Result rows: list of flat string dicts, one per symbol
     result_rows: list[dict[str, str]] = []
     # TF columns for the current result set (max 5)
@@ -237,11 +248,13 @@ class AppState(rx.State):
             label = s.replace("NSE:", "").replace("-EQ", "")
             if query and query not in label.upper():
                 continue
-            results.append({
-                "sym": s,
-                "label": label,
-                "checked": "true" if s in pending else "false",
-            })
+            results.append(
+                {
+                    "sym": s,
+                    "label": label,
+                    "checked": "true" if s in pending else "false",
+                }
+            )
             if len(results) >= 50:
                 break
         return results
@@ -349,6 +362,28 @@ class AppState(rx.State):
         self.auto_refresh = True
         yield AppState.run_screener
 
+    @staticmethod
+    def _due_symbols(
+        symbols: list[str],
+        symbol_times: dict[str, str],
+        interval_sec: int,
+    ) -> list[str]:
+        now = datetime.now()
+        due: list[str] = []
+        for sym in symbols:
+            iso_dt = symbol_times.get(sym)
+            if not iso_dt:
+                due.append(sym)
+                continue
+            try:
+                last_dt = datetime.fromisoformat(iso_dt)
+            except Exception:
+                due.append(sym)
+                continue
+            if (now - last_dt).total_seconds() >= interval_sec:
+                due.append(sym)
+        return due
+
     # ------------------------------------------------------------------
     # Background screener task
     # ------------------------------------------------------------------
@@ -362,15 +397,16 @@ class AppState(rx.State):
             self.status_text = "Starting screener…"
 
         while True:
-            # Snapshot settings + reset display state under lock
             async with self:
-                token   = self.access_token
-                syms    = list(self.selected_symbols)
-                tfs     = list(self.selected_timeframes)
-                method  = self.method
-                prox    = self.proximity
+                token = self.access_token
+                syms = list(self.selected_symbols)
+                tfs = list(self.selected_timeframes)
+                method = self.method
+                prox = self.proximity
                 s_times = dict(self.symbol_times)
-                self.result_rows = []
+                existing = list(self.result_rows)
+                is_auto = self.auto_refresh
+                interval_lbl = self.refresh_interval_label
                 self.result_timeframes_display = list(tfs[:5])
                 self.n_result_tfs = len(tfs[:5])
 
@@ -380,8 +416,25 @@ class AppState(rx.State):
                     self.is_running = False
                 return
 
+            interval_sec = _INTERVAL_MAP.get(interval_lbl, 300)
+            run_syms = (
+                syms if not is_auto else self._due_symbols(syms, s_times, interval_sec)
+            )
+
+            if is_auto and not run_syms:
+                async with self:
+                    self.status_text = (
+                        "No symbols due yet. Waiting for next refresh slot…"
+                    )
+                await asyncio.sleep(1)
+                async with self:
+                    if not self.auto_refresh:
+                        self.is_running = False
+                        return
+                continue
+
             try:
-                client  = FyersClient(access_token=token)
+                client = FyersClient(access_token=token)
                 app_config.STRUCTURE_METHOD = method
                 app_config.STRUCTURE_PROXIMITY_PCT = prox
                 screener = Screener(client)
@@ -390,7 +443,7 @@ class AppState(rx.State):
 
                 def _worker() -> None:
                     try:
-                        for item in screener.stream(syms, tfs):
+                        for item in screener.stream(run_syms, tfs):
                             result_q.put(("result", item))
                         result_q.put(("done", None))
                     except Exception as exc:
@@ -400,6 +453,11 @@ class AppState(rx.State):
 
                 seen: set[str] = set()
                 new_times: dict[str, str] = dict(s_times)
+                merged_by_sym = {
+                    r["sym"]: dict(r)
+                    for r in existing
+                    if isinstance(r, dict) and r.get("sym") in set(syms)
+                }
 
                 while True:
                     try:
@@ -417,7 +475,7 @@ class AppState(rx.State):
                     if kind == "done":
                         now_str = datetime.now().strftime("%d %b %Y  %H:%M:%S")
                         async with self:
-                            self.updated_at  = now_str
+                            self.updated_at = now_str
                             self.status_text = f"Last updated: {now_str}"
                         break
 
@@ -427,37 +485,35 @@ class AppState(rx.State):
                             new_times[sym] = datetime.now().isoformat()
                             seen.add(sym)
 
-                    dt_times = {k: datetime.fromisoformat(v) for k, v in new_times.items()}
+                    dt_times = {
+                        k: datetime.fromisoformat(v) for k, v in new_times.items()
+                    }
                     rows = _build_result_rows(regimes, signals, levels, tfs, dt_times)
+                    for row in rows:
+                        merged_by_sym[row["sym"]] = row
+                    ordered_rows = [
+                        merged_by_sym[s] for s in syms if s in merged_by_sym
+                    ]
 
                     async with self:
                         self.symbol_times = dict(new_times)
-                        self.progress     = i
-                        self.total        = total
-                        self.status_text  = f"Analysing {i} / {total}…"
-                        self.result_rows  = rows
+                        self.progress = i
+                        self.total = total
+                        self.status_text = f"Refreshing {i} / {total} due symbols…"
+                        self.result_rows = ordered_rows
 
             except Exception as exc:
                 async with self:
                     self.status_text = f"Unexpected error: {exc}"
-                    self.is_running  = False
+                    self.is_running = False
                 return
 
-            # Check auto-refresh
             async with self:
-                keep_going    = self.auto_refresh
-                interval_lbl  = self.refresh_interval_label
+                keep_going = self.auto_refresh
 
             if not keep_going:
                 async with self:
                     self.is_running = False
                 return
 
-            wait_sec = _INTERVAL_MAP.get(interval_lbl, 300)
-            # Sleep in small chunks so a toggle-off is responsive
-            for _ in range(wait_sec * 10):
-                await asyncio.sleep(0.1)
-                async with self:
-                    if not self.auto_refresh:
-                        self.is_running = False
-                        return
+            await asyncio.sleep(0.2)
