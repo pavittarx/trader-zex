@@ -5,6 +5,8 @@ Run:
     reflex run
 """
 
+# pyright: reportGeneralTypeIssues=false, reportArgumentType=false, reportCallIssue=false, reportIndexIssue=false
+
 import reflex as rx
 
 from trader_zex.state import AppState
@@ -13,38 +15,48 @@ from trader_zex.state import AppState
 # Results table helpers
 # ---------------------------------------------------------------------------
 
+
 def _regime_badge(regime: rx.Var, cls: rx.Var) -> rx.Component:
     return rx.badge(
         regime,
-        color_scheme=rx.match(
-            cls,
-            ("bullish",  "green"),
-            ("bearish",  "red"),
-            ("sideways", "yellow"),
-            "gray",
-        ),
+        color_scheme="gray",
+        variant="soft",
         size="1",
-        style={"font_size": "11px", "white_space": "nowrap"},
+        style={
+            "font_size": "11px",
+            "white_space": "nowrap",
+            "color": rx.match(
+                cls,
+                ("bullish", "var(--green-11)"),
+                ("bearish", "var(--red-11)"),
+                ("sideways", "var(--yellow-11)"),
+                "var(--gray-11)",
+            ),
+        },
     )
 
 
 def _signal_badge(signal: rx.Var, cls: rx.Var) -> rx.Component:
     return rx.badge(
         signal,
-        color_scheme=rx.match(
-            cls,
-            ("strong-buy",  "jade"),
-            ("weak-buy",    "teal"),
-            ("strong-sell", "red"),
-            ("avoid",       "crimson"),
-            ("take-profit", "yellow"),
-            ("watch",       "blue"),
-            ("wait",        "violet"),
-            "gray",
-        ),
+        color_scheme="gray",
         variant="soft",
         size="1",
-        style={"font_size": "11px", "white_space": "nowrap"},
+        style={
+            "font_size": "11px",
+            "white_space": "nowrap",
+            "color": rx.match(
+                cls,
+                ("strong-buy", "var(--jade-11)"),
+                ("weak-buy", "var(--teal-11)"),
+                ("strong-sell", "var(--red-11)"),
+                ("avoid", "var(--crimson-11)"),
+                ("take-profit", "var(--yellow-11)"),
+                ("watch", "var(--blue-11)"),
+                ("wait", "var(--violet-11)"),
+                "var(--gray-11)",
+            ),
+        },
     )
 
 
@@ -96,20 +108,20 @@ def _result_row(row: rx.Var) -> rx.Component:
         _tf_data_cell(row, 3),
         _tf_data_cell(row, 4),
         rx.table.cell(row["support"], white_space="nowrap"),
-        rx.table.cell(row["dist_s"],  white_space="nowrap"),
+        rx.table.cell(row["dist_s"], white_space="nowrap"),
         rx.table.cell(row["resistance"], white_space="nowrap"),
-        rx.table.cell(row["dist_r"],  white_space="nowrap"),
+        rx.table.cell(row["dist_r"], white_space="nowrap"),
         rx.table.cell(
             row["location"],
             color=rx.match(
                 row["loc_cls"],
-                ("at-support",    "var(--green-10)"),
+                ("at-support", "var(--green-10)"),
                 ("at-resistance", "var(--red-10)"),
                 "inherit",
             ),
             font_weight=rx.match(
                 row["loc_cls"],
-                ("at-support",    "600"),
+                ("at-support", "600"),
                 ("at-resistance", "600"),
                 "400",
             ),
@@ -122,7 +134,7 @@ def _result_row(row: rx.Var) -> rx.Component:
                 row["fetched_cls"],
                 ("age-fresh", "var(--green-10)"),
                 ("age-stale", "var(--yellow-10)"),
-                ("age-old",   "var(--red-10)"),
+                ("age-old", "var(--red-10)"),
                 "var(--gray-8)",
             ),
             white_space="nowrap",
@@ -169,7 +181,7 @@ def _results_table() -> rx.Component:
             size="1",
             style={
                 "font_family": "'SF Mono','Fira Code','Consolas',monospace",
-                "font_size":   "12px",
+                "font_size": "12px",
             },
             width="100%",
         ),
@@ -178,9 +190,11 @@ def _results_table() -> rx.Component:
         width="100%",
     )
 
+
 # ---------------------------------------------------------------------------
 # Auth page
 # ---------------------------------------------------------------------------
+
 
 def auth_page() -> rx.Component:
     return rx.center(
@@ -246,26 +260,48 @@ def auth_page() -> rx.Component:
 # Sidebar
 # ---------------------------------------------------------------------------
 
+
 def _symbol_tags() -> rx.Component:
-    return rx.flex(
-        rx.foreach(
-            AppState.symbol_entries,
-            lambda entry: rx.badge(
-                entry["label"],
-                rx.icon(
-                    "x",
-                    size=12,
-                    cursor="pointer",
-                    on_click=AppState.remove_symbol(entry["sym"]),
-                    style={"margin_left": "4px"},
+    return rx.scroll_area(
+        rx.flex(
+            rx.foreach(
+                AppState.symbol_entries,
+                lambda entry: rx.box(
+                    rx.hstack(
+                        rx.text(
+                            entry["label"],
+                            size="1",
+                            white_space="nowrap",
+                            overflow="hidden",
+                            text_overflow="ellipsis",
+                            max_width="100px",
+                        ),
+                        rx.icon(
+                            "x",
+                            size=11,
+                            cursor="pointer",
+                            on_click=AppState.remove_symbol(entry["sym"]),
+                        ),
+                        justify="between",
+                        align="center",
+                        width="100%",
+                        spacing="2",
+                    ),
+                    padding="3px 6px",
+                    border="1px solid #2a2a2a",
+                    border_radius="6px",
+                    background="#111",
+                    width="calc(50% - 4px)",
                 ),
-                variant="soft",
-                color_scheme="gray",
-                style={"cursor": "default"},
             ),
+            wrap="wrap",
+            gap="1",
+            width="100%",
         ),
-        wrap="wrap",
-        gap="1",
+        type="always",
+        scrollbars="vertical",
+        height="120px",
+        width="100%",
     )
 
 
@@ -288,6 +324,20 @@ def _add_symbol_popover() -> rx.Component:
                     value=AppState.symbol_search,
                     on_change=AppState.set_symbol_search,
                     width="100%",
+                    size="1",
+                ),
+                rx.hstack(
+                    rx.text(AppState.add_count_label, size="1", color_scheme="gray"),
+                    rx.button(
+                        "Select All",
+                        on_click=AppState.select_all_filtered_symbols,
+                        variant="soft",
+                        color_scheme="gray",
+                        size="1",
+                    ),
+                    justify="between",
+                    width="100%",
+                    align="center",
                 ),
                 rx.scroll_area(
                     rx.vstack(
@@ -297,10 +347,15 @@ def _add_symbol_popover() -> rx.Component:
                                 rx.hstack(
                                     rx.cond(
                                         item["checked"] == "true",
-                                        rx.text("✓", color_scheme="jade", weight="bold"),
-                                        rx.text("○", color_scheme="gray"),
+                                        rx.text(
+                                            "✓",
+                                            color_scheme="jade",
+                                            weight="bold",
+                                            size="1",
+                                        ),
+                                        rx.text("○", color_scheme="gray", size="1"),
                                     ),
-                                    rx.text(item["label"], size="2"),
+                                    rx.text(item["label"], size="1"),
                                     spacing="2",
                                     align="center",
                                 ),
@@ -309,7 +364,7 @@ def _add_symbol_popover() -> rx.Component:
                                 color_scheme=rx.cond(
                                     item["checked"] == "true", "jade", "gray"
                                 ),
-                                size="2",
+                                size="1",
                                 width="100%",
                                 justify="start",
                             ),
@@ -318,40 +373,37 @@ def _add_symbol_popover() -> rx.Component:
                         width="100%",
                         align="start",
                     ),
-                    height="260px",
+                    height="220px",
                     width="100%",
                 ),
                 rx.hstack(
-                    rx.text(AppState.add_count_label, size="1", color_scheme="gray"),
-                    rx.hstack(
-                        rx.popover.close(
-                            rx.button(
-                                "Cancel",
-                                variant="ghost",
-                                color_scheme="gray",
-                                size="2",
-                                on_click=AppState.clear_symbol_selection,
-                            ),
+                    rx.popover.close(
+                        rx.button(
+                            "Cancel",
+                            variant="ghost",
+                            color_scheme="gray",
+                            size="1",
+                            on_click=AppState.clear_symbol_selection,
                         ),
-                        rx.popover.close(
-                            rx.button(
-                                "Add Selected",
-                                color_scheme="jade",
-                                size="2",
-                                disabled=~AppState.has_pending_add,
-                                on_click=AppState.add_selected_symbols,
-                            ),
-                        ),
-                        spacing="2",
                     ),
-                    justify="between",
+                    rx.popover.close(
+                        rx.button(
+                            "Add Selected",
+                            color_scheme="jade",
+                            size="1",
+                            disabled=~AppState.has_pending_add,
+                            on_click=AppState.add_selected_symbols,
+                        ),
+                    ),
+                    spacing="2",
+                    justify="end",
                     width="100%",
                     align="center",
                 ),
-                spacing="3",
-                width="260px",
+                spacing="2",
+                width="300px",
             ),
-            padding="1em",
+            padding="0.8em",
         ),
     )
 
@@ -394,11 +446,10 @@ def sidebar() -> rx.Component:
         rx.vstack(
             rx.heading("Trader-Zex", size="5"),
             rx.text("HMM Regime Screener", size="1", color_scheme="gray"),
-
             rx.divider(),
-
             # ---- Symbols ----
             rx.text("Watchlist", weight="bold", size="2"),
+            rx.text(AppState.watchlist_count_label, size="1", color_scheme="gray"),
             _symbol_tags(),
             _add_symbol_popover(),
             rx.button(
@@ -409,15 +460,11 @@ def sidebar() -> rx.Component:
                 variant="soft",
                 color_scheme="gray",
             ),
-
             rx.divider(),
-
             # ---- Timeframes ----
             rx.text("Timeframes", weight="bold", size="2"),
             _timeframe_checkboxes(),
-
             rx.divider(),
-
             # ---- Structure ----
             rx.text("Structure Detector", weight="bold", size="2"),
             rx.text("Method", size="1", color_scheme="gray"),
@@ -451,9 +498,7 @@ def sidebar() -> rx.Component:
                 width="100%",
                 spacing="2",
             ),
-
             rx.divider(),
-
             # ---- Run ----
             rx.button(
                 rx.cond(
@@ -466,17 +511,15 @@ def sidebar() -> rx.Component:
                 color_scheme="jade",
                 disabled=AppState.is_running,
             ),
-
             rx.divider(),
-
             # ---- Auto-refresh ----
             rx.text("Auto-refresh", weight="bold", size="2"),
             rx.select.root(
                 rx.select.trigger(width="100%"),
                 rx.select.content(
-                    rx.select.item("1 min",  value="1 min"),
-                    rx.select.item("3 min",  value="3 min"),
-                    rx.select.item("5 min",  value="5 min"),
+                    rx.select.item("1 min", value="1 min"),
+                    rx.select.item("3 min", value="3 min"),
+                    rx.select.item("5 min", value="5 min"),
                     rx.select.item("10 min", value="10 min"),
                 ),
                 value=AppState.refresh_interval_label,
@@ -499,8 +542,10 @@ def sidebar() -> rx.Component:
                 AppState.auto_refresh,
                 rx.callout(
                     rx.hstack(
-                        rx.text(f"Refreshing every ", size="1"),
-                        rx.text(AppState.refresh_interval_label, size="1", weight="bold"),
+                        rx.text("Refreshing every ", size="1"),
+                        rx.text(
+                            AppState.refresh_interval_label, size="1", weight="bold"
+                        ),
                         spacing="1",
                     ),
                     color_scheme="jade",
@@ -508,9 +553,7 @@ def sidebar() -> rx.Component:
                     width="100%",
                 ),
             ),
-
             rx.divider(),
-
             # ---- Auth ----
             rx.button(
                 "🔒 Re-authenticate",
@@ -520,7 +563,6 @@ def sidebar() -> rx.Component:
                 color_scheme="gray",
                 size="2",
             ),
-
             spacing="3",
             width="100%",
             align="start",
@@ -540,6 +582,7 @@ def sidebar() -> rx.Component:
 # Main content
 # ---------------------------------------------------------------------------
 
+
 def results_section() -> rx.Component:
     return rx.box(
         rx.vstack(
@@ -556,7 +599,6 @@ def results_section() -> rx.Component:
                 ),
                 width="100%",
             ),
-
             # Table (or placeholder)
             rx.cond(
                 AppState.has_results,
@@ -581,7 +623,6 @@ def results_section() -> rx.Component:
                     padding="4em",
                 ),
             ),
-
             width="100%",
             align="start",
             spacing="4",
@@ -596,6 +637,7 @@ def results_section() -> rx.Component:
 # ---------------------------------------------------------------------------
 # Root page
 # ---------------------------------------------------------------------------
+
 
 def index() -> rx.Component:
     return rx.cond(
@@ -624,4 +666,6 @@ app = rx.App(
     ),
     stylesheets=[],
 )
-app.add_page(index, route="/", title="Trader-Zex | Regime Screener", on_load=AppState.on_load)
+app.add_page(
+    index, route="/", title="Trader-Zex | Regime Screener", on_load=AppState.on_load
+)

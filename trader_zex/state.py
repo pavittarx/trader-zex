@@ -179,11 +179,34 @@ class AppState(rx.State):
     def set_symbol_search(self, val: str) -> None:
         self.symbol_search = val
 
+    def _matching_available_symbols(self) -> list[str]:
+        """All symbols that match current search and are not already in watchlist."""
+        query = self.symbol_search.upper().strip()
+        current = set(self.selected_symbols)
+        matches: list[str] = []
+        for s in self.all_symbol_options:
+            if s in current:
+                continue
+            label = s.replace("NSE:", "").replace("-EQ", "")
+            if query and query not in label.upper():
+                continue
+            matches.append(s)
+        return matches
+
     def toggle_symbol_selection(self, sym: str) -> None:
         if sym in self.symbols_to_add:
             self.symbols_to_add = [s for s in self.symbols_to_add if s != sym]
         else:
             self.symbols_to_add = self.symbols_to_add + [sym]
+
+    def select_all_filtered_symbols(self) -> None:
+        pending = set(self.symbols_to_add)
+        pending.update(self._matching_available_symbols())
+        self.symbols_to_add = [
+            s
+            for s in self.all_symbol_options
+            if s in pending and s not in set(self.selected_symbols)
+        ]
 
     def add_selected_symbols(self):
         current = set(self.selected_symbols)
@@ -235,19 +258,13 @@ class AppState(rx.State):
     @rx.var
     def filtered_available(self) -> list[dict[str, str]]:
         """
-        Searchable, capped symbol list for the multi-add popover.
-        Each entry: {sym, label, checked}.  Max 50 results.
+        Searchable, compact symbol list for the multi-add popover.
+        Each entry: {sym, label, checked}.  Max 80 results.
         """
-        query = self.symbol_search.upper().strip()
-        current = set(self.selected_symbols)
         pending = set(self.symbols_to_add)
         results: list[dict[str, str]] = []
-        for s in self.all_symbol_options:
-            if s in current:
-                continue
+        for s in self._matching_available_symbols():
             label = s.replace("NSE:", "").replace("-EQ", "")
-            if query and query not in label.upper():
-                continue
             results.append(
                 {
                     "sym": s,
@@ -255,14 +272,22 @@ class AppState(rx.State):
                     "checked": "true" if s in pending else "false",
                 }
             )
-            if len(results) >= 50:
+            if len(results) >= 80:
                 break
         return results
 
     @rx.var
+    def watchlist_count_label(self) -> str:
+        return f"{len(self.selected_symbols)} selected / {len(self.all_symbol_options)} in universe"
+
+    @rx.var
+    def filtered_available_count(self) -> int:
+        return len(self._matching_available_symbols())
+
+    @rx.var
     def add_count_label(self) -> str:
         n = len(self.symbols_to_add)
-        return f"{n} selected" if n else "None selected"
+        return f"{n} selected / {self.filtered_available_count} available"
 
     @rx.var
     def has_pending_add(self) -> bool:
