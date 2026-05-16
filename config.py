@@ -133,3 +133,21 @@ STRUCTURE_EMA_PERIOD = 20  # EMA period for band midline
 STRUCTURE_ATR_MULT = 2.0  # band width = EMA ± multiplier × ATR
 STRUCTURE_PROXIMITY_PCT = 2.0  # % distance to consider "at" a level
 STRUCTURE_PIVOT_DISTANCE = 5  # min bars between pivots (scipy find_peaks)
+
+# --- Stock Ranker Configuration ---
+RANKER_TOP_N: int = 25                   # top-N long and top-N short candidates
+RANKER_CACHE_FILE = Path("~/.trader_zex_rankings.json").expanduser()
+RANKER_WEIGHT_SIGNAL: float = 0.40       # confluence signal strength
+RANKER_WEIGHT_STRUCTURE: float = 0.30   # proximity to support/resistance
+RANKER_WEIGHT_MOMENTUM: float = 0.20    # price momentum (5d + 20d returns)
+RANKER_WEIGHT_VOLUME: float = 0.10      # volume surge vs. 20-day average
+RANKER_MOMENTUM_DAYS: tuple[int, int] = (5, 20)   # short and long windows
+
+# --- Backtester Configuration ---
+BACKTEST_INITIAL_CAPITAL: float = 1_000_000.0   # ₹10 lakh starting balance
+BACKTEST_RISK_PCT: float = 0.02                 # 2% of equity risked per trade
+BACKTEST_STOP_BUFFER: float = 0.005             # 0.5% buffer past S/R for stop
+BACKTEST_COMMISSION: float = 0.0003             # 0.03% per leg (brokerage + STT)
+BACKTEST_EOD_EXIT_HOUR_IST: int = 15            # flatten all positions at 15:15 IST
+BACKTEST_EOD_EXIT_MINUTE_IST: int = 15
+BACKTEST_SIGNAL_WARMUP: int = HMM_MIN_SAMPLES   # bars needed before first signal

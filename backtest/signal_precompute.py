@@ -1,0 +1,168 @@
+"""
+signal_precompute.py — Rolling HMM + confluence signals with no look-ahead bias.
+
+For each 15-min bar at index i, only bars[0..i] are used to compute the HMM
+regime and structure levels. This mirrors what would be known in live trading
+at that point in time.
+
+Performance note
+----------------
+Computing a fresh HMM fit per bar is O(N²) total. For ~1,400 bars (90 days of
+15-min data), this takes ~20-60 seconds per symbol. Results are cached to disk
+keyed by (symbol, date_from, date_to) to avoid recomputation on reruns.
+
+Output
+------
+DataFrame indexed by 15-min timestamp (UTC-naive, matching Fyers IST naive
+timestamps converted consistently with data_loader.py) with columns:
+  regime_15m, regime_60m, signal_15m, support, resistance, location,
+  support_dist_pct, resistance_dist_pct
+"""
+
+from __future__ import annotations
+
+import hashlib
+import logging
+import pickle
+from pathlib import Path
+
+import pandas as pd
+
+import config
+from confluence import generate_signal
+from hmm_model import HMMModel
+from structure import StructureDetector
+
+log = logging.getLogger(__name__)
+
+_CACHE_DIR = Path("~/.trader_zex_signal_cache").expanduser()
+_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+# Compute signal every N bars; interpolate in between (reduces computation ~4x)
+_STEP = 4
+
+
+def compute_rolling_signals(
+    df_15m: pd.DataFrame,
+    df_60m: pd.DataFrame,
+    warmup: int = config.BACKTEST_SIGNAL_WARMUP,
+    cache_key: str | None = None,
+) -> pd.DataFrame:
+    """
+    Compute per-bar signals for df_15m using rolling windows of 15-min and
+    60-min data. No future bar is ever accessed.
+
+    Parameters
+    ----------
+    df_15m     : 15-min OHLCV DataFrame with DatetimeIndex (IST naive)
+    df_60m     : 60-min OHLCV DataFrame with DatetimeIndex (IST naive)
+    warmup     : minimum bars before signals start (default = HMM_MIN_SAMPLES)
+    cache_key  : optional string key for disk cache; None = no caching
+
+    Returns
+    -------
+    DataFrame indexed by 15-min timestamp with signal columns.
+    """
+    if cache_key:
+        cached = _load_cache(cache_key)
+        if cached is not None:
+            log.info("Signal cache hit: %s (%d rows)", cache_key, len(cached))
+            return cached
+
+    log.info("Precomputing rolling signals (%d bars, step=%d) …", len(df_15m), _STEP)
+    records = _compute(df_15m, df_60m, warmup)
+    result = pd.DataFrame(records).set_index("timestamp") if records else pd.DataFrame()
+
+    if cache_key and not result.empty:
+        _save_cache(cache_key, result)
+
+    return result
+
+
+def _compute(
+    df_15m: pd.DataFrame,
+    df_60m: pd.DataFrame,
+    warmup: int,
+) -> list[dict]:
+    hmm = HMMModel()
+    det = StructureDetector()
+    timestamps = df_15m.index.tolist()
+    n = len(timestamps)
+    records: list[dict] = []
+    last_record: dict | None = None
+
+    for i in range(warmup, n):
+        ts = timestamps[i]
+
+        # Fill bars between computed steps by repeating the last known signal
+        if i % _STEP != 0 and last_record is not None:
+            records.append({**last_record, "timestamp": ts})
+            continue
+
+        window_15 = df_15m.iloc[: i + 1]
+        window_60 = df_60m[df_60m.index <= ts]
+
+        if len(window_60) < warmup // 4:
+            continue
+
+        try:
+            hmm_15 = hmm.detect_regime(window_15)
+            struct = det.detect(window_15)
+            signal = generate_signal(hmm_15.current_regime, struct.location)
+            regime_15 = hmm_15.current_regime
+        except Exception as exc:
+            log.debug("15-min analysis failed at %s: %s", ts, exc)
+            if last_record:
+                records.append({**last_record, "timestamp": ts})
+            continue
+
+        try:
+            hmm_60 = hmm.detect_regime(window_60)
+            regime_60 = hmm_60.current_regime
+        except Exception:
+            regime_60 = regime_15
+
+        rec = {
+            "timestamp": ts,
+            "regime_15m": regime_15,
+            "regime_60m": regime_60,
+            "signal_15m": signal,
+            "support": struct.support,
+            "resistance": struct.resistance,
+            "location": struct.location,
+            "support_dist_pct": struct.support_dist_pct,
+            "resistance_dist_pct": struct.resistance_dist_pct,
+        }
+        records.append(rec)
+        last_record = rec
+
+    return records
+
+
+def make_cache_key(symbol: str, date_from: object, date_to: object) -> str:
+    raw = f"{symbol}_{date_from}_{date_to}"
+    return hashlib.md5(raw.encode()).hexdigest()[:16]
+
+
+def _cache_path(key: str) -> Path:
+    return _CACHE_DIR / f"{key}.pkl"
+
+
+def _load_cache(key: str) -> pd.DataFrame | None:
+    path = _cache_path(key)
+    if path.exists():
+        try:
+            with open(path, "rb") as f:
+                return pickle.load(f)
+        except Exception as exc:
+            log.warning("Signal cache read failed (%s): %s", key, exc)
+    return None
+
+
+def _save_cache(key: str, df: pd.DataFrame) -> None:
+    try:
+        with open(_cache_path(key), "wb") as f:
+            pickle.dump(df, f)
+        log.debug("Signal cache saved: %s", key)
+    except Exception as exc:
+        log.warning("Signal cache write failed: %s", exc)
