@@ -100,8 +100,8 @@ class StructureDetector:
         below = swing_lows[swing_lows < price]
         above = swing_highs[swing_highs > price]
 
-        support    = float(below.max())  if len(below) > 0 else float(lows.min())
-        resistance = float(above.min()) if len(above) > 0 else float(highs.max())
+        support    = float(below.max()) if len(below) > 0 else float(lows.min())
+        resistance = float(above.min()) if len(above) > 0 else float(price * 1.02)
 
         return self._build_result(price, support, resistance)
 
@@ -110,6 +110,9 @@ class StructureDetector:
     # ------------------------------------------------------------------
 
     def _build_result(self, price: float, support: float, resistance: float) -> StructureResult:
+        if price == 0:
+            return StructureResult(support=0.0, resistance=0.0, location="In Middle",
+                                   support_dist_pct=0.0, resistance_dist_pct=0.0)
         support_dist    = (price - support)    / price * 100
         resistance_dist = (resistance - price) / price * 100
 
