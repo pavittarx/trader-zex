@@ -8,11 +8,10 @@ Takes a list of BacktestResult objects (one per symbol) and produces:
 
 Metrics reported
 ----------------
-  Total return %
-  Sharpe ratio (annualised, 252 days × 26 bars/day for 15-min)
-  Max drawdown %
+  Total P&L (₹ absolute)
   Win rate %
   Profit factor
+  Max drawdown (₹)
   Trade count
 """
 
@@ -27,8 +26,6 @@ import pandas as pd
 from backtest.engine import BacktestResult
 
 log = logging.getLogger(__name__)
-
-_BARS_PER_YEAR = 252 * 26   # 15-min bars in a trading year
 
 
 def summarise(results: list[BacktestResult]) -> pd.DataFrame:
@@ -77,52 +74,75 @@ def _extract_row(r: BacktestResult) -> dict:
         "date_to": str(r.date_to),
     }
 
-    # Pull from returns_stats if populated by NT analyzer
-    rs = r.returns_stats or {}
-    row["sharpe"] = _round(rs.get("Sharpe ratio", rs.get("SharpeRatio")))
-    row["sortino"] = _round(rs.get("Sortino ratio", rs.get("SortinoRatio")))
-
-    # Compute from fills report if available
+    # Compute metrics from positions report if available
     if r.report_df is not None and not r.report_df.empty:
-        fills_metrics = _from_fills(r.report_df)
-        row.update(fills_metrics)
+        pos_metrics = _from_positions(r.report_df)
+        row.update(pos_metrics)
     else:
-        row.update({"total_return_pct": None, "win_rate_pct": None,
-                    "max_drawdown_pct": None, "profit_factor": None})
+        row.update({
+            "total_pnl_inr": None,
+            "win_rate_pct": None,
+            "max_drawdown_inr": None,
+            "profit_factor": None,
+        })
 
     return row
 
 
-def _from_fills(fills: pd.DataFrame) -> dict:
-    """Derive basic metrics from a NautilusTrader order fills report."""
+def _from_positions(positions_df: pd.DataFrame, instrument_id: str | None = None) -> dict:
+    """
+    Derive basic metrics from a NautilusTrader positions report.
+
+    The positions report's ``realized_pnl`` column contains strings like
+    "2910.00 INR". This function parses them into floats.
+
+    Parameters
+    ----------
+    positions_df  : DataFrame from engine.trader.generate_positions_report()
+    instrument_id : if provided, filter to this instrument_id string first
+    """
     metrics: dict = {}
     try:
-        if "realized_pnl" in fills.columns:
-            pnls = fills["realized_pnl"].dropna().astype(float)
-        elif "commission" in fills.columns:
-            # Fallback: no P&L column available
+        df = positions_df.copy()
+
+        if instrument_id is not None and "instrument_id" in df.columns:
+            df = df[df["instrument_id"].astype(str) == instrument_id]
+
+        if df.empty or "realized_pnl" not in df.columns:
             return metrics
-        else:
+
+        # Parse "2910.00 INR" → 2910.0
+        def _parse_pnl(val) -> float:
+            try:
+                return float(str(val).split()[0])
+            except (ValueError, IndexError):
+                return float("nan")
+
+        pnls = df["realized_pnl"].apply(_parse_pnl).dropna()
+
+        if pnls.empty:
             return metrics
 
         wins = pnls[pnls > 0]
         losses = pnls[pnls < 0]
 
-        metrics["win_rate_pct"] = round(len(wins) / len(pnls) * 100, 1) if len(pnls) > 0 else None
-        metrics["total_return_pct"] = round(pnls.sum(), 2)   # absolute ₹ P&L
+        metrics["win_rate_pct"] = (
+            round(len(wins) / len(pnls) * 100, 1) if len(pnls) > 0 else None
+        )
+        metrics["total_pnl_inr"] = round(float(pnls.sum()), 2)
         metrics["profit_factor"] = (
-            round(wins.sum() / abs(losses.sum()), 2)
+            round(float(wins.sum()) / float(abs(losses.sum())), 2)
             if losses.sum() != 0 else None
         )
 
-        # Simple drawdown from cumulative P&L
+        # Drawdown from cumulative P&L curve
         cum = pnls.cumsum()
         roll_max = cum.cummax()
-        dd = (cum - roll_max)
-        metrics["max_drawdown_pct"] = round(float(dd.min()), 2)
+        dd = cum - roll_max
+        metrics["max_drawdown_inr"] = round(float(dd.min()), 2)
 
     except Exception as exc:
-        log.debug("fills metrics extraction failed: %s", exc)
+        log.debug("positions metrics extraction failed: %s", exc)
 
     return metrics
 

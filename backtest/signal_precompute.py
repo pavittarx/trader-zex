@@ -38,8 +38,8 @@ log = logging.getLogger(__name__)
 _CACHE_DIR = Path("~/.trader_zex_signal_cache").expanduser()
 _CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-# Compute signal every N bars; interpolate in between (reduces computation ~4x)
-_STEP = 4
+# Compute signal every bar (no interpolation — avoids stale signals at regime transitions)
+_STEP = 1
 
 
 def compute_rolling_signals(
@@ -140,7 +140,18 @@ def _compute(
 
 
 def make_cache_key(symbol: str, date_from: object, date_to: object) -> str:
-    raw = f"{symbol}_{date_from}_{date_to}"
+    """
+    Generate a cache key that includes a hash of the relevant config params.
+    This ensures stale signals are not reused when HMM or structure config changes.
+    """
+    cfg_str = (
+        f"{config.HMM_N_STATES}_{config.HMM_RANDOM_STATE}_"
+        f"{config.STRUCTURE_METHOD}_{config.STRUCTURE_ATR_PERIOD}_"
+        f"{config.STRUCTURE_EMA_PERIOD}_{config.STRUCTURE_ATR_MULT}_"
+        f"{config.STRUCTURE_PROXIMITY_PCT}"
+    )
+    cfg_hash = hashlib.md5(cfg_str.encode()).hexdigest()[:8]
+    raw = f"{symbol}_{date_from}_{date_to}_{cfg_hash}"
     return hashlib.md5(raw.encode()).hexdigest()[:16]
 
 

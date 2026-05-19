@@ -5,13 +5,16 @@ Entry rules (Long)
 ------------------
   60-min regime = Bullish  AND
   15-min signal ∈ {STRONG BUY, WEAK BUY}  AND
-  no existing long position
+  regime is stable (last N signals agree)  AND
+  no existing position
 
 Entry rules (Short)
 -------------------
   60-min regime = Bearish  AND
   15-min signal ∈ {STRONG SELL, AVOID}  AND
-  no existing short position
+  regime is stable (last N signals agree)  AND
+  allow_shorts = True  AND
+  no existing position
 
 Exit rules
 ----------
@@ -39,6 +42,7 @@ import pandas as pd
 from nautilus_trader.config import StrategyConfig
 from nautilus_trader.model.data import Bar, BarType
 from nautilus_trader.model.enums import OrderSide, TimeInForce
+from nautilus_trader.model.events import OrderRejected, PositionClosed
 from nautilus_trader.model.identifiers import InstrumentId, Venue
 from nautilus_trader.model.objects import Quantity
 from nautilus_trader.trading.strategy import Strategy
@@ -59,12 +63,18 @@ class HMMStrategyConfig(StrategyConfig, frozen=True):
     stop_buffer: float = config.BACKTEST_STOP_BUFFER
     eod_exit_hour: int = config.BACKTEST_EOD_EXIT_HOUR_IST
     eod_exit_minute: int = config.BACKTEST_EOD_EXIT_MINUTE_IST
+    allow_shorts: bool = config.BACKTEST_ALLOW_SHORTS
+    regime_stability_bars: int = config.BACKTEST_REGIME_STABILITY_BARS
 
 
 class HMMConfluenceStrategy(Strategy):
     """
     Trades based on pre-computed HMM regime + confluence signals.
     One instance per symbol; run inside a BacktestEngine.
+
+    Position state is derived from portfolio.is_net_long / is_net_short
+    rather than manually tracked, to avoid desync on order rejection.
+    Only _stop_price and _trade_count are maintained as manual state.
     """
 
     def __init__(self, config: HMMStrategyConfig) -> None:
@@ -73,12 +83,11 @@ class HMMConfluenceStrategy(Strategy):
         self._bar_type = BarType.from_str(config.bar_type_15m)
         self._venue = Venue(config.instrument_id.split(".")[-1])
 
-        # Build a pandas Series for fast timestamp lookup
+        # Build a pandas DataFrame for fast timestamp lookup
         self._signals: pd.DataFrame = self._parse_signals(config.signal_records)
 
-        self._position_side: str | None = None  # "LONG", "SHORT", or None
+        # Only manually-tracked state (portfolio handles position side)
         self._stop_price: float | None = None
-        self._entry_price: float | None = None
         self._trade_count = 0
 
     # ------------------------------------------------------------------
@@ -95,8 +104,12 @@ class HMMConfluenceStrategy(Strategy):
         close = float(bar.close)
         ts_ist = _bar_ts_to_ist(bar.ts_event)
 
+        is_long = self.portfolio.is_net_long(self._iid)
+        is_short = self.portfolio.is_net_short(self._iid)
+        has_position = is_long or is_short
+
         # EOD forced exit
-        if self._position_side is not None:
+        if has_position:
             if _is_eod(ts_ist, self.config.eod_exit_hour, self.config.eod_exit_minute):
                 self._close_position("EOD")
                 return
@@ -112,23 +125,24 @@ class HMMConfluenceStrategy(Strategy):
         location = sig.get("location", "In Middle")
 
         # --- Exit existing position first ---
-        if self._position_side == "LONG":
-            stop_hit = self._stop_price and close <= self._stop_price
+        if is_long:
+            stop_hit = self._stop_price is not None and close <= self._stop_price
             if signal_15 == "TAKE PROFIT" or regime_60 == "Bearish" or stop_hit:
                 self._close_position(f"LONG_EXIT ({signal_15})")
                 return
 
-        elif self._position_side == "SHORT":
-            stop_hit = self._stop_price and close >= self._stop_price
+        elif is_short:
+            stop_hit = self._stop_price is not None and close >= self._stop_price
             if location == "At Support" or regime_60 == "Bullish" or stop_hit:
                 self._close_position(f"SHORT_EXIT ({signal_15})")
                 return
 
         # --- Entry ---
-        if self._position_side is None:
+        if not has_position:
             if (
                 regime_60 == "Bullish"
                 and signal_15 in {"STRONG BUY", "WEAK BUY"}
+                and self._regime_is_stable(ts_ist, "Bullish")
             ):
                 stop_level = support * (1 - self.config.stop_buffer)
                 qty = self._position_size(close, stop_level)
@@ -140,14 +154,14 @@ class HMMConfluenceStrategy(Strategy):
                         time_in_force=TimeInForce.GTC,
                     )
                     self.submit_order(order)
-                    self._position_side = "LONG"
                     self._stop_price = stop_level
-                    self._entry_price = close
                     self._trade_count += 1
 
             elif (
-                regime_60 == "Bearish"
+                self.config.allow_shorts
+                and regime_60 == "Bearish"
                 and signal_15 in {"STRONG SELL", "AVOID"}
+                and self._regime_is_stable(ts_ist, "Bearish")
             ):
                 stop_level = resistance * (1 + self.config.stop_buffer)
                 qty = self._position_size(close, stop_level)
@@ -159,13 +173,22 @@ class HMMConfluenceStrategy(Strategy):
                         time_in_force=TimeInForce.GTC,
                     )
                     self.submit_order(order)
-                    self._position_side = "SHORT"
                     self._stop_price = stop_level
-                    self._entry_price = close
                     self._trade_count += 1
 
+    def on_order_rejected(self, event: OrderRejected) -> None:
+        """Called when an order is rejected — roll back manual state."""
+        self.log.info(f"Order rejected: {event.reason}. Resetting stop and decrementing trade count.")
+        self._stop_price = None
+        self._trade_count = max(0, self._trade_count - 1)
+
+    def on_position_closed(self, event: PositionClosed) -> None:
+        """Called when a position is fully closed — reset stop price."""
+        if event.instrument_id == self._iid:
+            self._stop_price = None
+
     def on_stop(self) -> None:
-        if self._position_side is not None:
+        if self.portfolio.is_net_long(self._iid) or self.portfolio.is_net_short(self._iid):
             self.close_all_positions(self._iid)
 
     # ------------------------------------------------------------------
@@ -173,11 +196,10 @@ class HMMConfluenceStrategy(Strategy):
     # ------------------------------------------------------------------
 
     def _close_position(self, reason: str) -> None:
-        self.log.info(f"Closing {self._position_side}: {reason}")
+        side = "LONG" if self.portfolio.is_net_long(self._iid) else "SHORT"
+        self.log.info(f"Closing {side}: {reason}")
         self.close_all_positions(self._iid)
-        self._position_side = None
-        self._stop_price = None
-        self._entry_price = None
+        # _stop_price is reset via on_position_closed
 
     def _position_size(self, price: float, stop: float) -> int:
         """Shares to trade = (equity × risk_pct) / |price − stop|."""
@@ -190,6 +212,24 @@ class HMMConfluenceStrategy(Strategy):
             equity = config.BACKTEST_INITIAL_CAPITAL
         shares = int((equity * self.config.risk_pct) / stop_distance)
         return max(shares, 1)
+
+    def _regime_is_stable(self, ts_ist: pd.Timestamp, regime: str) -> bool:
+        """
+        Return True if the last regime_stability_bars signals all agree on `regime`.
+        If fewer bars are available, fall back to accepting whatever is present.
+        """
+        n = self.config.regime_stability_bars
+        if n <= 1 or self._signals.empty:
+            return True
+
+        # Convert ts_ist back to IST-naive for index comparison
+        # Find the last N rows at or before ts_ist
+        mask = self._signals.index <= ts_ist
+        recent = self._signals[mask].tail(n)
+        if len(recent) < n:
+            # Not enough history yet — be conservative, require full window
+            return False
+        return all(recent["regime_60m"] == regime)
 
     def _get_signal(self, ts_event_ns: int) -> dict | None:
         if self._signals.empty:

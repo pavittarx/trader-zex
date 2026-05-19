@@ -227,6 +227,12 @@ class StockRanker:
             except Exception as exc:
                 log.debug("Signal fetch failed for %s: %s", sym, exc)
 
+        success = len(result)
+        failed = len(symbols) - success
+        log.info(
+            "Signal fetch complete: %d/%d symbols succeeded, %d failed/skipped",
+            success, len(symbols), failed,
+        )
         return result
 
     def _fetch_momentum(self, symbols: list[str]) -> dict[str, dict]:
