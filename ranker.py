@@ -296,7 +296,14 @@ class StockRanker:
         elif regime_60m == "Bearish":
             direction = "SHORT"
         else:
-            direction = "LONG"   # Sideways: default to long side, lower score
+            # Sideways: let the 15-min signal decide direction
+            # Positive-biased signals → LONG; negative-biased → SHORT
+            _LONG_BIASED = {"STRONG BUY", "WEAK BUY", "WATCH", "TAKE PROFIT"}
+            _SHORT_BIASED = {"STRONG SELL", "AVOID", "WAIT"}
+            if signal_15m in _SHORT_BIASED:
+                direction = "SHORT"
+            else:
+                direction = "LONG"  # NEUTRAL / WATCH → lean long
 
         # --- Factor 1: Signal strength (normalised to [-1, 1]) ---
         if direction == "LONG":
@@ -306,20 +313,31 @@ class StockRanker:
 
         # --- Factor 2: Structure proximity ---
         # Closer to support (long) / resistance (short) = higher score
+        # Score is 1.0 when at S/R, 0 at 5× proximity threshold, negative beyond
         prox = config.STRUCTURE_PROXIMITY_PCT
         if direction == "LONG":
-            prox_score = max(0.0, 1.0 - support_dist / (prox * 5))
+            prox_score = 1.0 - support_dist / (prox * 5)
+            prox_score = max(-1.0, min(1.0, prox_score))  # clamp to [-1, 1]
         else:
-            prox_score = max(0.0, 1.0 - resistance_dist / (prox * 5))
+            prox_score = 1.0 - resistance_dist / (prox * 5)
+            prox_score = max(-1.0, min(1.0, prox_score))
 
         # --- Factor 3: Momentum (normalised, long wants positive, short wants negative) ---
         mom_5d = mom_data["momentum_5d"]
         mom_score_raw = float(pd.Series([mom_5d]).clip(-0.10, 0.10).iloc[0] / 0.10)
         mom_score = mom_score_raw if direction == "LONG" else -mom_score_raw
 
-        # --- Factor 4: Volume surge (0→1 scale, capped at 3×) ---
+        # --- Factor 4: Volume surge — signed by price direction ---
+        # Up-volume confirms long; down-volume (selling climax) penalises long
         vol_surge = mom_data["volume_surge"]
-        vol_score = min(vol_surge / 3.0, 1.0)
+        vol_direction = 1.0 if mom_5d >= 0 else -1.0
+        vol_score_raw = min(vol_surge / 3.0, 1.0)
+        # For long candidates: up-volume is good, down-volume is bad
+        # For short candidates: invert
+        if direction == "LONG":
+            vol_score = vol_score_raw * vol_direction
+        else:
+            vol_score = vol_score_raw * (-vol_direction)
 
         w = {
             "signal":    config.RANKER_WEIGHT_SIGNAL,
