@@ -25,6 +25,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+import config
 from backtest.engine import BacktestResult
 
 log = logging.getLogger(__name__)
@@ -60,8 +61,10 @@ def print_summary(results: list[BacktestResult]) -> None:
     # Preferred column order for readability
     preferred = [
         "trades", "date_from", "date_to",
-        "total_pnl_inr", "win_rate_pct", "profit_factor",
+        "total_pnl_inr", "total_return_pct", "annualized_return_pct",
+        "win_rate_pct", "profit_factor",
         "max_drawdown_inr", "total_cost_inr", "cost_pct_of_gross",
+        "avg_holding_bars",
     ]
     cols = [c for c in preferred if c in df.columns] + [
         c for c in df.columns if c not in preferred
@@ -74,6 +77,9 @@ def print_summary(results: list[BacktestResult]) -> None:
     if len(df) > 1 and len(numeric_cols) > 0:
         print("\nAggregate (mean across symbols):")
         print(df[numeric_cols].mean().to_string())
+
+    print("\nNote: No benchmark comparison available. Run with Nifty buy-and-hold over")
+    print("      the same period to judge alpha. Annualized return assumes compounding.")
     print()
 
 
@@ -98,6 +104,18 @@ def _extract_row(r: BacktestResult) -> dict:
             "total_cost_inr": None,
             "cost_pct_of_gross": None,
         })
+
+    # Annualized return from total P&L
+    initial_capital = config.BACKTEST_INITIAL_CAPITAL
+    if r.report_df is not None and row.get("total_pnl_inr") is not None:
+        total_days = (r.date_to - r.date_from).days
+        if total_days > 0:
+            total_return = row["total_pnl_inr"] / initial_capital
+            ann_factor = 365.0 / total_days
+            row["total_return_pct"] = round(total_return * 100, 2)
+            row["annualized_return_pct"] = round(
+                ((1 + total_return) ** ann_factor - 1) * 100, 2
+            )
 
     return row
 
@@ -175,6 +193,13 @@ def _from_positions(positions_df: pd.DataFrame, instrument_id: str | None = None
             gross = abs(metrics.get("total_pnl_inr") or 0) + float(costs.sum())
             if gross > 0:
                 metrics["cost_pct_of_gross"] = round(float(costs.sum()) / gross * 100, 1)
+
+        # Average holding duration in 15-min bars
+        if "duration_ns" in df.columns:
+            avg_duration_ns = df["duration_ns"].dropna().mean()
+            if not pd.isna(avg_duration_ns):
+                # Convert nanoseconds to 15-min bars (1 bar = 15 * 60 * 1e9 ns)
+                metrics["avg_holding_bars"] = round(float(avg_duration_ns) / (15 * 60 * 1e9), 1)
 
     except Exception as exc:
         log.debug("positions metrics extraction failed: %s", exc)

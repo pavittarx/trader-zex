@@ -21,6 +21,12 @@ Usage
     # Specify date range:
     uv run python -m backtest --date-from 2024-01-01 --date-to 2024-06-30
 
+    # Walk-forward validation (split date range into N windows):
+    uv run python -m backtest --date-from 2024-01-01 --date-to 2024-12-31 --walk-forward 4
+
+    # Cost sensitivity sweep (run at 0.5×, 1×, 1.5×, 2× commission):
+    uv run python -m backtest --sensitivity
+
     # Verbose NautilusTrader internal logs:
     uv run python -m backtest --log-level INFO
 """
@@ -93,6 +99,22 @@ def parse_args() -> argparse.Namespace:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="NautilusTrader internal log level.",
     )
+    p.add_argument(
+        "--walk-forward", type=int, default=0, metavar="N",
+        help=(
+            "Split the date range into N equal windows and run each independently. "
+            "Results should be consistent across windows; high variance = overfitting. "
+            "Example: --date-from 2024-01-01 --date-to 2024-12-31 --walk-forward 4"
+        ),
+    )
+    p.add_argument(
+        "--sensitivity", action="store_true",
+        help=(
+            "Run backtest at 0.5×, 1×, 1.5×, and 2× the configured commission rate "
+            "and print a comparison table. Strategies that flip sign within 2× cost "
+            "uncertainty have no margin of safety."
+        ),
+    )
     return p.parse_args()
 
 
@@ -147,6 +169,94 @@ def main() -> None:
         log.info("Using DEFAULT_SYMBOLS (%d)", len(symbols))
 
     allow_shorts = args.allow_shorts
+
+    # --walk-forward: split date range into N windows, run each independently
+    if args.walk_forward > 0:
+        n = args.walk_forward
+        total_days = (date_to - date_from).days
+        window_days = total_days // n
+        print(f"\nWalk-forward: {n} windows of ~{window_days} days each")
+        print("=" * 70)
+
+        all_window_results: list[list[BacktestResult]] = []
+        for w in range(n):
+            w_from = date_from + timedelta(days=w * window_days)
+            w_to = (
+                date_from + timedelta(days=(w + 1) * window_days)
+                if w < n - 1
+                else date_to
+            )
+            print(f"\nWindow {w+1}/{n}: {w_from} -> {w_to}")
+            w_results_map = run_backtest_portfolio(
+                client, fyers_syms=symbols,
+                date_from=w_from, date_to=w_to,
+                log_level=args.log_level, allow_shorts=allow_shorts,
+            )
+            w_results = [r for r in w_results_map.values()]
+            all_window_results.append(w_results)
+            print_summary(w_results)
+
+        # Consistency check across windows
+        print("\n" + "=" * 70)
+        print("Walk-forward consistency summary:")
+        for w, w_results in enumerate(all_window_results):
+            total_trades = sum(r.trade_count for r in w_results)
+            total_pnls = [
+                r.report_df["realized_pnl"].apply(
+                    lambda v: float(str(v).split()[0])
+                ).sum()
+                if r.report_df is not None and not r.report_df.empty
+                and "realized_pnl" in r.report_df.columns
+                else 0.0
+                for r in w_results
+            ]
+            net_pnl = sum(total_pnls)
+            w_from = date_from + timedelta(days=w * window_days)
+            print(f"  Window {w+1}: {w_from}  trades={total_trades:3d}  net_pnl=₹{net_pnl:,.0f}")
+        print()
+        return  # walk-forward already printed results
+
+    # --sensitivity: run at 0.5×, 1×, 1.5×, 2× commission and compare
+    if args.sensitivity:
+        base_buy = config.BACKTEST_COMMISSION_BUY
+        base_sell = config.BACKTEST_COMMISSION_SELL
+        multipliers = [0.5, 1.0, 1.5, 2.0]
+
+        print(f"\nCost sensitivity sweep (base: buy={base_buy:.4f}, sell={base_sell:.4f})")
+        print("=" * 70)
+        print(f"  {'Multiplier':>12}  {'Buy leg':>10}  {'Sell leg':>10}  {'Trades':>7}  {'Net P&L':>12}")
+        print("  " + "-" * 60)
+
+        for mult in multipliers:
+            eff_buy = base_buy * mult
+            eff_sell = base_sell * mult
+
+            sens_map = run_backtest_portfolio(
+                client, fyers_syms=symbols,
+                date_from=date_from, date_to=date_to,
+                log_level="ERROR", allow_shorts=allow_shorts,
+                commission_buy=eff_buy,
+                commission_sell=eff_sell,
+            )
+            trades = sum(r.trade_count for r in sens_map.values())
+            net_pnl = sum(
+                float(str(r.report_df["realized_pnl"].iloc[0]).split()[0])
+                if r.report_df is not None and not r.report_df.empty
+                and "realized_pnl" in r.report_df.columns
+                else 0.0
+                for r in sens_map.values()
+            )
+            marker = " <- baseline" if mult == 1.0 else ""
+            print(
+                f"  {mult:>11.1f}x  {eff_buy:.4f}     "
+                f"{eff_sell:.4f}    {trades:>7d}  ₹{net_pnl:>11,.0f}{marker}"
+            )
+
+        print()
+        print("  Note: commissions passed explicitly to each run — exact re-simulation.")
+        print("  Strategy flips sign between 1x and 2x -> no cost margin of safety.")
+        print()
+        return
 
     # Run portfolio backtest (shared engine, shared capital)
     results_map = run_backtest_portfolio(

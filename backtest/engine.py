@@ -179,6 +179,8 @@ def run_backtest_portfolio(
     date_to: date | None = None,
     log_level: str = "WARNING",
     allow_shorts: bool = config.BACKTEST_ALLOW_SHORTS,
+    commission_buy: float | None = None,
+    commission_sell: float | None = None,
 ) -> dict[str, BacktestResult]:
     """
     Run a portfolio backtest: all symbols share one engine and one ₹10L account.
@@ -189,12 +191,14 @@ def run_backtest_portfolio(
 
     Parameters
     ----------
-    client      : FyersClient instance
-    fyers_syms  : list of Fyers symbols, e.g. ["NSE:RELIANCE-EQ", ...]
-    date_from   : start of backtest window (default: 90 days ago)
-    date_to     : end of backtest window (default: today)
-    log_level   : NautilusTrader internal log verbosity
-    allow_shorts: whether to enable short-selling (default from config)
+    client          : FyersClient instance
+    fyers_syms      : list of Fyers symbols, e.g. ["NSE:RELIANCE-EQ", ...]
+    date_from       : start of backtest window (default: 90 days ago)
+    date_to         : end of backtest window (default: today)
+    log_level       : NautilusTrader internal log verbosity
+    allow_shorts    : whether to enable short-selling (default from config)
+    commission_buy  : override buy-leg commission rate (default: config value)
+    commission_sell : override sell-leg commission rate (default: config value)
 
     Returns
     -------
@@ -242,7 +246,12 @@ def run_backtest_portfolio(
         }
 
         # Add instrument and bar data to the shared engine
-        instrument = make_equity(fyers_sym)
+        # Pass commission overrides if provided (used by sensitivity sweep)
+        instrument = make_equity(
+            fyers_sym,
+            commission_buy=commission_buy if commission_buy is not None else config.BACKTEST_COMMISSION_BUY,
+            commission_sell=commission_sell if commission_sell is not None else config.BACKTEST_COMMISSION_SELL,
+        )
         engine.add_instrument(instrument)
 
         bar_type_15m = make_bar_type(instrument.id, "15")
