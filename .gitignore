@@ -18,3 +18,6 @@ wheels/
 .env
 *.log
 .web/*
+
+# Claude Code internal state
+.claude/
