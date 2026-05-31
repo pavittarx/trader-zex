@@ -152,17 +152,25 @@ class StockRanker:
         self._save_cache(result)
         return result
 
-    def compute_scores(self, symbols: list[str]) -> pd.DataFrame:
+    def compute_scores(self, symbols: list[str], as_of_date: date | None = None) -> pd.DataFrame:
         """
         Compute per-symbol multi-factor composite scores.
+
+        Parameters
+        ----------
+        symbols :
+            List of Fyers symbol strings to score.
+        as_of_date :
+            If provided, fetch data strictly up to this date (point-in-time).
+            Defaults to None, which fetches up to today.
 
         Returns a DataFrame with one row per symbol and columns:
             symbol, direction, composite_score, signal_15m, regime_60m,
             support, resistance, momentum_5d, volume_surge, proximity_score,
             plus individual factor scores.
         """
-        signal_map = self._fetch_signals(symbols)
-        momentum_map = self._fetch_momentum(symbols)
+        signal_map = self._fetch_signals(symbols, as_of_date=as_of_date)
+        momentum_map = self._fetch_momentum(symbols, as_of_date=as_of_date)
 
         rows = []
         for sym in symbols:
@@ -179,10 +187,18 @@ class StockRanker:
     # Factor computation
     # ------------------------------------------------------------------
 
-    def _fetch_signals(self, symbols: list[str]) -> dict[str, dict]:
+    def _fetch_signals(self, symbols: list[str], as_of_date: date | None = None) -> dict[str, dict]:
         """
         Fetch 15-min and 60-min signals for all symbols using the same
         batching strategy as Screener: one 1-min fetch per symbol → resample.
+
+        Parameters
+        ----------
+        symbols :
+            List of Fyers symbol strings to fetch.
+        as_of_date :
+            If provided, fetch data strictly up to this date (point-in-time).
+            Defaults to None, which fetches up to today.
 
         Returns {symbol: {signal_15m, regime_15m, regime_60m, support,
                           resistance, location, support_dist_pct,
@@ -190,10 +206,12 @@ class StockRanker:
         """
         result: dict[str, dict] = {}
         total = len(symbols)
+        date_to = as_of_date or date.today()
+        date_from = date_to - timedelta(days=config.LOOKBACK_DAYS.get("1", 30))
         for i, sym in enumerate(symbols, 1):
             log.info("[%d/%d] Fetching signals: %s", i, total, sym)
             try:
-                base = self._client.get_history(sym, "1")
+                base = self._client.get_history(sym, "1", date_from=date_from, date_to=date_to)
                 if base.empty:
                     continue
 
@@ -235,16 +253,24 @@ class StockRanker:
         )
         return result
 
-    def _fetch_momentum(self, symbols: list[str]) -> dict[str, dict]:
+    def _fetch_momentum(self, symbols: list[str], as_of_date: date | None = None) -> dict[str, dict]:
         """
         Fetch 30 days of daily bars for all symbols and compute:
           - 5-day price return
           - volume surge (5-day avg volume / 20-day avg volume)
 
+        Parameters
+        ----------
+        symbols :
+            List of Fyers symbol strings to fetch.
+        as_of_date :
+            If provided, fetch data strictly up to this date (point-in-time).
+            Defaults to None, which fetches up to today.
+
         Returns {symbol: {momentum_5d, volume_surge}}
         """
         result: dict[str, dict] = {}
-        date_to = date.today()
+        date_to = as_of_date or date.today()
         date_from = date_to - timedelta(days=35)
 
         daily_data = self._client.get_history_multi(
