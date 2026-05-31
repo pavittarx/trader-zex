@@ -23,6 +23,7 @@ HMM_N_ITER = 1000
 HMM_RANDOM_STATE = 42
 # Minimum bars required to fit the model reliably
 HMM_MIN_SAMPLES = 100
+HMM_MAX_WINDOW: int | None = None  # None = expanding window (current); set to e.g. 500 for rolling
 
 # --- Screener Defaults ---
 ALL_SYMBOLS = [

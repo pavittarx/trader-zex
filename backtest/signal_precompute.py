@@ -91,6 +91,10 @@ def _compute(
     records: list[dict] = []
     last_record: dict | None = None
 
+    flip_count = 0
+    prev_regime_15: str | None = None
+    prev_regime_60: str | None = None
+
     for i in range(warmup, n):
         ts = timestamps[i]
 
@@ -106,7 +110,7 @@ def _compute(
             continue
 
         try:
-            hmm_15 = hmm.detect_regime(window_15)
+            hmm_15 = hmm.detect_regime(window_15, max_window=config.HMM_MAX_WINDOW)
             struct = det.detect(window_15)
             signal = generate_signal(hmm_15.current_regime, struct.location)
             regime_15 = hmm_15.current_regime
@@ -117,10 +121,17 @@ def _compute(
             continue
 
         try:
-            hmm_60 = hmm.detect_regime(window_60)
+            hmm_60 = hmm.detect_regime(window_60, max_window=config.HMM_MAX_WINDOW)
             regime_60 = hmm_60.current_regime
         except Exception:
             regime_60 = regime_15
+
+        if prev_regime_15 is not None and regime_15 != prev_regime_15:
+            flip_count += 1
+        if prev_regime_60 is not None and regime_60 != prev_regime_60:
+            flip_count += 1
+        prev_regime_15 = regime_15
+        prev_regime_60 = regime_60
 
         rec = {
             "timestamp": ts,
@@ -135,6 +146,14 @@ def _compute(
         }
         records.append(rec)
         last_record = rec
+
+    total_bars = len(records)
+    if total_bars > 0:
+        log.info(
+            "Regime label flips: %d across %d bars (%.1f%% flip rate) — "
+            "high rate (>20%%) may indicate HMM label instability",
+            flip_count, total_bars, 100 * flip_count / total_bars,
+        )
 
     return records
 

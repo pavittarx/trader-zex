@@ -60,15 +60,20 @@ class HMMModel:
     # Public API
     # ------------------------------------------------------------------
 
-    def detect_regime(self, data: pd.DataFrame) -> HMMResult:
+    def detect_regime(self, df: pd.DataFrame, max_window: int | None = None) -> HMMResult:
         """
-        Fit the HMM on *data* and return labelled regimes plus the current state.
+        Fit the HMM on *df* and return labelled regimes plus the current state.
 
         Parameters
         ----------
-        data : pd.DataFrame with columns open, high, low, close, volume.
-               Needs at least config.HMM_MIN_SAMPLES rows.
+        df         : pd.DataFrame with columns open, high, low, close, volume.
+                     Needs at least config.HMM_MIN_SAMPLES rows.
+        max_window : if set, only use the last max_window bars for fitting.
+                     This improves stationarity but reduces sample size.
+                     None = use full window (existing behaviour).
         """
+        data = df if max_window is None else df.iloc[-max_window:]
+
         if len(data) < config.HMM_MIN_SAMPLES:
             raise ValueError(
                 f"Need at least {config.HMM_MIN_SAMPLES} bars to fit the HMM, "
