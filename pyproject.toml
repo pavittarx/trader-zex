@@ -25,6 +25,12 @@ dev = [
     "pytest>=9.0.3",
 ]
 
+[tool.pytest.ini_options]
+addopts = "-m 'not slow'"
+markers = [
+    "slow: marks tests as slow (HMM fit); deselected by default — run with -m slow",
+]
+
 [tool.poe.tasks]
 screen    = "python main.py"
 universe  = "python main.py --universe"
