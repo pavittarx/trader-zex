@@ -65,6 +65,9 @@ class HMMStrategyConfig(StrategyConfig, frozen=True):
     eod_exit_minute: int = config.BACKTEST_EOD_EXIT_MINUTE_IST
     allow_shorts: bool = config.BACKTEST_ALLOW_SHORTS
     regime_stability_bars: int = config.BACKTEST_REGIME_STABILITY_BARS
+    max_position_pct: float = config.BACKTEST_MAX_POSITION_PCT
+    max_participation: float = config.BACKTEST_MAX_PARTICIPATION
+    max_gross_exposure: float = config.BACKTEST_MAX_GROSS_EXPOSURE
 
 
 class HMMConfluenceStrategy(Strategy):
@@ -126,13 +129,18 @@ class HMMConfluenceStrategy(Strategy):
 
         # --- Exit existing position first ---
         if is_long:
-            stop_hit = self._stop_price is not None and close <= self._stop_price
+            # Check intrabar touch (bar.low) AND closing price to avoid optimistic fills
+            stop_hit = self._stop_price is not None and (
+                float(bar.low) <= self._stop_price or close <= self._stop_price
+            )
             if signal_15 == "TAKE PROFIT" or regime_60 == "Bearish" or stop_hit:
                 self._close_position(f"LONG_EXIT ({signal_15})")
                 return
 
         elif is_short:
-            stop_hit = self._stop_price is not None and close >= self._stop_price
+            stop_hit = self._stop_price is not None and (
+                float(bar.high) >= self._stop_price or close >= self._stop_price
+            )
             if location == "At Support" or regime_60 == "Bullish" or stop_hit:
                 self._close_position(f"SHORT_EXIT ({signal_15})")
                 return
@@ -145,8 +153,8 @@ class HMMConfluenceStrategy(Strategy):
                 and self._regime_is_stable(ts_ist, "Bullish")
             ):
                 stop_level = support * (1 - self.config.stop_buffer)
-                qty = self._position_size(close, stop_level)
-                if qty > 0:
+                qty = self._position_size(close, stop_level, bar_volume=int(bar.volume))
+                if qty > 0 and self._within_exposure_limit():
                     order = self.order_factory.market(
                         instrument_id=self._iid,
                         order_side=OrderSide.BUY,
@@ -164,8 +172,8 @@ class HMMConfluenceStrategy(Strategy):
                 and self._regime_is_stable(ts_ist, "Bearish")
             ):
                 stop_level = resistance * (1 + self.config.stop_buffer)
-                qty = self._position_size(close, stop_level)
-                if qty > 0:
+                qty = self._position_size(close, stop_level, bar_volume=int(bar.volume))
+                if qty > 0 and self._within_exposure_limit():
                     order = self.order_factory.market(
                         instrument_id=self._iid,
                         order_side=OrderSide.SELL,
@@ -201,8 +209,8 @@ class HMMConfluenceStrategy(Strategy):
         self.close_all_positions(self._iid)
         # _stop_price is reset via on_position_closed
 
-    def _position_size(self, price: float, stop: float) -> int:
-        """Shares to trade = (equity × risk_pct) / |price − stop|."""
+    def _position_size(self, price: float, stop: float, bar_volume: int = 0) -> int:
+        """Shares = (equity × risk_pct) / |price − stop|, capped by notional and volume."""
         stop_distance = abs(price - stop)
         if stop_distance < 0.01:
             return 0
@@ -210,8 +218,35 @@ class HMMConfluenceStrategy(Strategy):
             equity = float(self.portfolio.equity(self._venue).as_decimal())
         except Exception:
             equity = config.BACKTEST_INITIAL_CAPITAL
+
         shares = int((equity * self.config.risk_pct) / stop_distance)
+
+        # Cap 1: notional limit (max_position_pct of equity)
+        max_by_notional = int((equity * self.config.max_position_pct) / price)
+        shares = min(shares, max_by_notional)
+
+        # Cap 2: participation limit (only if bar volume is known)
+        if bar_volume > 0:
+            max_by_vol = int(bar_volume * self.config.max_participation)
+            shares = min(shares, max_by_vol)
+
         return max(shares, 1)
+
+    def _within_exposure_limit(self) -> bool:
+        """Return True if gross exposure is below the configured cap.
+
+        Fails open (returns True) if the portfolio API is unavailable, so that
+        the trade is not silently blocked by an instrumentation error.
+        """
+        try:
+            equity = float(self.portfolio.equity(self._venue).as_decimal())
+            if equity <= 0:
+                return True
+            net_exp = self.portfolio.net_exposures(self._venue)
+            iid_exp = net_exp.get(self._iid, 0) if net_exp else 0
+            return abs(float(iid_exp)) / equity < self.config.max_gross_exposure
+        except Exception:
+            return True  # fail open — let the trade through if we can't compute
 
     def _regime_is_stable(self, ts_ist: pd.Timestamp, regime: str) -> bool:
         """

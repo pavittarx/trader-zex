@@ -63,8 +63,8 @@ def build_engine(log_level: str = "WARNING") -> BacktestEngine:
         starting_balances=[Money(config.BACKTEST_INITIAL_CAPITAL, INR)],
         fill_model=FillModel(
             prob_fill_on_limit=0.5,
-            prob_slippage=0.5,
-            random_seed=42,
+            prob_slippage=1.0,     # always model slippage (was 0.5 — decorative)
+            random_seed=None,      # remove fixed seed so slippage varies across runs
         ),
     )
     return engine

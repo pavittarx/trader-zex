@@ -148,9 +148,14 @@ RANKER_MOMENTUM_DAYS: tuple[int, int] = (5, 20)   # short and long windows
 BACKTEST_INITIAL_CAPITAL: float = 1_000_000.0   # ₹10 lakh starting balance
 BACKTEST_RISK_PCT: float = 0.02                 # 2% of equity risked per trade
 BACKTEST_STOP_BUFFER: float = 0.005             # 0.5% buffer past S/R for stop
-BACKTEST_COMMISSION: float = 0.00065            # 0.065% per leg (brokerage + STT + exchange + SEBI + stamp)
+BACKTEST_COMMISSION_BUY: float = 0.00120        # buy leg: exchange + SEBI + stamp + GST ≈ 12 bps
+BACKTEST_COMMISSION_SELL: float = 0.00370       # sell leg: above + STT 25 bps = 37 bps
+BACKTEST_SLIPPAGE_BPS: float = 3.0              # half-spread estimate per leg in bps
 BACKTEST_EOD_EXIT_HOUR_IST: int = 15            # flatten all positions at 15:15 IST
 BACKTEST_EOD_EXIT_MINUTE_IST: int = 15
 BACKTEST_SIGNAL_WARMUP: int = HMM_MIN_SAMPLES   # bars needed before first signal
 BACKTEST_ALLOW_SHORTS: bool = False             # long-only by default (Indian equity spot)
 BACKTEST_REGIME_STABILITY_BARS: int = 2         # require N consecutive signals agreeing before entry
+BACKTEST_MAX_POSITION_PCT: float = 0.10         # max 10% of equity in one position
+BACKTEST_MAX_PARTICIPATION: float = 0.05        # max 5% of bar volume
+BACKTEST_MAX_GROSS_EXPOSURE: float = 0.80       # max 80% of equity deployed at once

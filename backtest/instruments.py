@@ -23,10 +23,17 @@ def fyers_to_instrument_id(fyers_sym: str) -> InstrumentId:
     return InstrumentId(Symbol(ticker), NSE_VENUE)
 
 
-def make_equity(fyers_sym: str, commission: float = config.BACKTEST_COMMISSION) -> Equity:
-    """Create a NautilusTrader Equity instrument for an NSE stock."""
+def make_equity(
+    fyers_sym: str,
+    commission_buy: float = config.BACKTEST_COMMISSION_BUY,
+    commission_sell: float = config.BACKTEST_COMMISSION_SELL,
+) -> Equity:
+    """Create a NautilusTrader Equity instrument for an NSE stock.
+
+    maker_fee  = buy-leg cost  (exchange + SEBI + stamp + GST ≈ 12 bps)
+    taker_fee  = sell-leg cost (above + STT 25 bps = 37 bps)
+    """
     instrument_id = fyers_to_instrument_id(fyers_sym)
-    fee = Decimal(str(round(commission, 6)))
     return Equity(
         instrument_id=instrument_id,
         raw_symbol=Symbol(instrument_id.symbol.value),
@@ -36,6 +43,6 @@ def make_equity(fyers_sym: str, commission: float = config.BACKTEST_COMMISSION) 
         lot_size=Quantity.from_int(1),
         ts_event=0,
         ts_init=0,
-        maker_fee=fee,
-        taker_fee=fee,
+        maker_fee=Decimal(str(round(commission_buy, 6))),
+        taker_fee=Decimal(str(round(commission_sell, 6))),
     )

@@ -13,6 +13,8 @@ Metrics reported
   Profit factor
   Max drawdown (₹)
   Trade count
+  Total cost (₹) — commissions parsed from positions report
+  Cost as % of gross P&L+cost
 """
 
 from __future__ import annotations
@@ -52,11 +54,20 @@ def print_summary(results: list[BacktestResult]) -> None:
         print("No results to display.")
         return
 
-    print("\n" + "=" * 72)
+    print("\n" + "=" * 80)
     print("  BACKTEST RESULTS")
-    print("=" * 72)
-    print(df.to_string())
-    print("=" * 72)
+    print("=" * 80)
+    # Preferred column order for readability
+    preferred = [
+        "trades", "date_from", "date_to",
+        "total_pnl_inr", "win_rate_pct", "profit_factor",
+        "max_drawdown_inr", "total_cost_inr", "cost_pct_of_gross",
+    ]
+    cols = [c for c in preferred if c in df.columns] + [
+        c for c in df.columns if c not in preferred
+    ]
+    print(df[cols].to_string())
+    print("=" * 80)
 
     # Aggregate stats
     numeric_cols = df.select_dtypes(include="number").columns
@@ -84,6 +95,8 @@ def _extract_row(r: BacktestResult) -> dict:
             "win_rate_pct": None,
             "max_drawdown_inr": None,
             "profit_factor": None,
+            "total_cost_inr": None,
+            "cost_pct_of_gross": None,
         })
 
     return row
@@ -110,6 +123,15 @@ def _from_positions(positions_df: pd.DataFrame, instrument_id: str | None = None
 
         if df.empty or "realized_pnl" not in df.columns:
             return metrics
+
+        # Sort by close time if available so equity curve and drawdown are correct
+        for col in ("ts_closed", "ts_last", "closed"):
+            if col in df.columns:
+                try:
+                    df = df.sort_values(col)
+                except Exception:
+                    pass
+                break
 
         # Parse "2910.00 INR" → 2910.0
         def _parse_pnl(val) -> float:
@@ -140,6 +162,19 @@ def _from_positions(positions_df: pd.DataFrame, instrument_id: str | None = None
         roll_max = cum.cummax()
         dd = cum - roll_max
         metrics["max_drawdown_inr"] = round(float(dd.min()), 2)
+
+        # Parse commissions (same "2910.00 INR" string format, may be "[2910.00 INR]")
+        if "commissions" in df.columns:
+            def _parse_cost(val) -> float:
+                try:
+                    return float(str(val).strip("[]").split()[0])
+                except (ValueError, IndexError):
+                    return float("nan")
+            costs = df["commissions"].apply(_parse_cost).dropna()
+            metrics["total_cost_inr"] = round(float(costs.sum()), 2)
+            gross = abs(metrics.get("total_pnl_inr") or 0) + float(costs.sum())
+            if gross > 0:
+                metrics["cost_pct_of_gross"] = round(float(costs.sum()) / gross * 100, 1)
 
     except Exception as exc:
         log.debug("positions metrics extraction failed: %s", exc)
