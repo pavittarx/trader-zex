@@ -122,8 +122,13 @@ LOOKBACK_DAYS: dict[str, int] = {
 }
 
 # --- Tradable Universe (nsepython) ---
-UNIVERSE_MAX_PRICE: float = 500.0       # upper LTP bound (₹)
-UNIVERSE_MIN_VOLUME: int = 500_000      # minimum daily traded volume
+UNIVERSE_MAX_PRICE: float = 5000.0      # upper LTP bound (₹) — raised from ₹500 to include quality large-caps
+UNIVERSE_MIN_VOLUME: int = 500_000      # minimum daily traded volume; raise to e.g. 2_000_000 for
+                                        # strategies with large position sizes (₹10L into 5% participation
+                                        # = ₹500k per trade → need at least 5M daily volume)
+# NOTE: UNIVERSE_MAX_PRICE must be >= the price of any stock in ALL_SYMBOLS / DEFAULT_SYMBOLS.
+# If this filter is tighter than the backtest universe, the live ranker and backtester
+# operate on disjoint symbol sets, making backtest results non-applicable to live trading.
 UNIVERSE_CACHE_FILE = Path("~/.trader_zex_universe.json").expanduser()
 WATCHLIST_FILE = Path("~/.trader_zex_watchlist.json").expanduser()
 
@@ -154,7 +159,9 @@ BACKTEST_SLIPPAGE_BPS: float = 3.0              # half-spread estimate per leg i
 BACKTEST_EOD_EXIT_HOUR_IST: int = 15            # flatten all positions at 15:15 IST
 BACKTEST_EOD_EXIT_MINUTE_IST: int = 15
 BACKTEST_SIGNAL_WARMUP: int = HMM_MIN_SAMPLES   # bars needed before first signal
-BACKTEST_ALLOW_SHORTS: bool = False             # long-only by default (Indian equity spot)
+BACKTEST_ALLOW_SHORTS: bool = False  # NSE cash-segment intraday short (MIS) must square off same day;
+                                      # no F&O lot sizes, borrow cost, or hard broker cut-off are modeled.
+                                      # Use False for any realistic cash-segment backtest.
 BACKTEST_REGIME_STABILITY_BARS: int = 2         # require N consecutive signals agreeing before entry
 BACKTEST_MAX_POSITION_PCT: float = 0.10         # max 10% of equity in one position
 BACKTEST_MAX_PARTICIPATION: float = 0.05        # max 5% of bar volume
