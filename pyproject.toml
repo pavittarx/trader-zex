@@ -15,11 +15,20 @@ dependencies = [
     "scikit-learn>=1.3.0",
     "scipy>=1.11.0",
     "reflex>=0.9.0",
+    "nautilus-trader>=1.208.0",
+    "pyarrow>=14.0.0",
 ]
 
 [dependency-groups]
 dev = [
     "poethepoet>=0.45.0",
+    "pytest>=9.0.3",
+]
+
+[tool.pytest.ini_options]
+addopts = "-m 'not slow'"
+markers = [
+    "slow: marks tests as slow (HMM fit); deselected by default — run with -m slow",
 ]
 
 [tool.poe.tasks]
@@ -27,3 +36,5 @@ screen    = "python main.py"
 universe  = "python main.py --universe"
 dashboard = "reflex run"
 auth      = "python auth.py"
+rank      = "python -m ranker"
+backtest  = "python -m backtest"

@@ -115,4 +115,16 @@ def get_tradable_universe() -> list[str]:
     )
 
     _save_cache(universe)
+
+    # Warn if any backtestable symbol is excluded by the price/volume filters
+    all_syms_set = set(config.ALL_SYMBOLS)
+    filtered_set = set(universe)
+    excluded = all_syms_set - filtered_set
+    if excluded:
+        log.warning(
+            "Universe filter excludes %d symbols from ALL_SYMBOLS: %s. "
+            "Consider raising UNIVERSE_MAX_PRICE (currently ₹%.0f).",
+            len(excluded), sorted(excluded)[:5], config.UNIVERSE_MAX_PRICE,
+        )
+
     return universe
