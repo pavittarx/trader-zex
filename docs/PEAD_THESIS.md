@@ -35,12 +35,31 @@ Sign L/S = long positive-reaction events, short negative, hold N days.
 Survived scaling from 44 → 186 events (1-day t held; 20-day drift emerged) —
 the test that killed `vol_z` and short-term reversal (both collapsed to zero).
 
+## 2b. Refinement (2026-06) — reaction-magnitude conditioning
+Splitting the 186 events at the median |reaction| (1.95%): the drift concentrates
+in LARGE-reaction events, as PEAD predicts (bigger news → more underreaction).
+
+| Horizon | LARGE \|react\| (n=93) | SMALL \|react\| (n=93) |
+|---------|----------------------|------------------------|
+| 1 day   | **+0.47% (t+2.36)**  | +0.16% (t+0.83) |
+| 10 day  | +0.72% (t+1.58)      | +0.43% (t+0.90) |
+| 20 day  | +1.43% (t+1.94)      | +0.91% (t+1.53) |
+
+Trading only large-reaction events ~doubles the per-trade margin (1-day LARGE
+≈ +27 bps net vs ~+11 unconditioned) AND cuts turnover (half the events).
+
+**EPS QoQ surprise (exploratory):** weak — IC +0.125 (t+1.70) at 1 day, ~0
+beyond. Shallow data (~5 quarters) + seasonality make raw QoQ EPS noisy; the
+price reaction already embeds the market's surprise-vs-expectations read, so it
+is the better signal. A fundamental-surprise angle needs a deeper data source
+(with consensus estimates).
+
 ## 3. Proposed rule (to validate, not yet trade)
-- **Signal:** on each earnings reaction day (t+1 after announcement), sign of the
-  reaction-day return.
+- **Filter:** only act on events with |reaction| ≥ ~2% (the drift lives here).
+- **Signal:** sign of the reaction-day (t+1) return.
 - **Entry:** at the reaction-day close — long if reaction up, short if down.
-- **Hold:** ~20 trading days (the form with the best net margin), or test a
-  shorter 1-day variant.
+- **Hold:** 1 day (robust core, ~+27 bps net/trade) or ~20 days (fatter
+  ~+118 bps but more period-dependent — H2-driven).
 - **Universe:** liquid large/mid-caps. Shorts via MIS/F&O constraints apply.
 - **Sizing:** equal-risk per event; standard caps (GUIDELINES §3e, §5).
 
