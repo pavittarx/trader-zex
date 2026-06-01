@@ -47,6 +47,16 @@ after daily-rebalance cost. Break-even ≈ 8 bps/day; no margin vs 12–25 bps r
 others. Only worth revisiting in a LOW-TURNOVER form (e.g. only the strongest
 breakouts, held longer / sized larger), not every-name-every-day.
 
+**Execution-lever follow-up (`continuation_limit.py`, broad univ, 6mo, |gap|>1%):**
+We attacked the cost wall directly — limit-order entry vs market, with honest
+adverse-selection accounting (a passive limit counts as filled only if price
+trades through it). Result: limit entry DOES help (+2.2 vs −1.3 bps/trade vs
+market) and fill rate stays high (89–99% — adverse selection is mild). BUT the
+net edge is **+2.2 bps/trade, t +0.4, win 50% — statistically zero.** The
+execution lever is real; the signal is simply too thin to clear it. Reaching
+t>2 would need ~25× the data. **Continuation is exhausted, including its best
+execution form.**
+
 ## 2. Intraday VWAP reversion
 **Edge:** transient order-flow imbalances push price away from VWAP; it reverts
 as liquidity replenishes intraday.
