@@ -63,6 +63,25 @@ is the better signal. A fundamental-surprise angle needs a deeper data source
 - **Universe:** liquid large/mid-caps. Shorts via MIS/F&O constraints apply.
 - **Sizing:** equal-risk per event; standard caps (GUIDELINES §3e, §5).
 
+## 3b. Portfolio backtest (2026-06) — `scripts/pead_backtest.py`
+Equal-weight active book (target 10 positions = full investment), |reaction|≥2%,
+enter reaction-day close, hold H, exit close, 20 bps round-trip. 47 names, ~2yr,
+89 trades.
+
+| Hold | CAGR | Sharpe | maxDD | Active days |
+|------|------|--------|-------|-------------|
+| 1 day  | +1.1% | +0.78 | −1.1% | 10% |
+| 5 day  | +0.5% | +0.21 | −2.5% | 22% |
+| 20 day | **+5.2%** | **+1.10** | **−3.0%** | 36% |
+
+**The edge survives portfolio assembly** (Sharpe ~1.1, shallow drawdowns, net of
+cost) — quality is good. But it is **low-capacity**: only 36% of days invested
+(1-day: 10%), because 47 names × ~4 events/yr is too few concurrent events to
+deploy capital. CAGR is modest for that reason, NOT signal weakness. Lever to
+scale: more names → more concurrent events → higher utilization at ~same Sharpe.
+Caveats: 89 trades / one ~2yr regime (wide error bars); close-to-close model,
+not execution-grade fills.
+
 ## 4. Net-of-cost margin
 20-day form: +1.17% gross/trade − ~15–25 bps round-trip ≈ **+95 bps/trade**.
 Low turnover means cost is paid rarely and dwarfed by the move — the opposite of
