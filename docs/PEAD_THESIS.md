@@ -117,3 +117,27 @@ the daily-rebalance signals.
 ## 6. Tools
 - `scripts/pead_event_ic.py` — the event-study IC harness (chunked daily fetch,
   t+1 reaction alignment).
+
+## 8. Fundamental-surprise attempt (2026-06) — negative, instructive
+Scraped deep quarterly EPS from screener.in (`scripts/screener_data.py`, ~13
+quarters/symbol vs nse's 5) to test a real YoY earnings surprise
+(`scripts/pead_fundamental.py`, 20 names, 160 events).
+
+| Horizon | IC(SUE) | t | IC(reaction) | t |
+|---------|---------|-----|--------------|-----|
+| 1 day   | +0.020 | +0.25 | −0.134 | −1.70 |
+| 5 day   | +0.054 | +0.68 | −0.234 | −3.03 |
+| 20 day  | −0.073 | −0.92 | −0.133 | −1.68 |
+
+**Verdict: free deeper data does NOT improve PEAD.**
+1. **YoY EPS surprise has no drift signal** (IC≈0). Raw YoY growth is largely
+   *anticipated* — a true "surprise" needs consensus ESTIMATES (actual vs.
+   expected), which screener lacks. The price reaction stays the better proxy.
+2. **Volume-snap dating is unreliable** — it flipped the reaction-IC negative,
+   contradicting the validated nse-exact-date study (+0.18). screener has no
+   clean announcement dates; snapping to the max-volume day mis-dates events.
+
+**Implication for data spend:** the missing ingredient is consensus estimates
+(paid: Trendlyne / EODHD / IBES), NOT more EPS history. Don't pursue further
+free-fundamental refinements. The validated price-reaction PEAD (§2–3b) — real
+but marginal, universe-dependent — remains the best form.
