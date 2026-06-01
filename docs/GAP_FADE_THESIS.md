@@ -1,8 +1,14 @@
 # Strategy Thesis — Intraday Gap Fade (NSE equities)
 
-Status: **candidate** — signal validated, tradability gated on execution cost.
-Documented per `STRATEGY_GUIDELINES.md` §9. Discovered 2026-06 after the
+Status: **REJECTED (2026-06)** — the daily-bar edge does not survive realistic
+intraday fills. See §8. Kept as a documented negative result and a lesson in
+fill realism. Documented per `STRATEGY_GUIDELINES.md` §9. Discovered after the
 HMM-confluence strategy was retired for having no edge (see GUIDELINES §10).
+
+> **TL;DR:** strong daily-bar IC (t −6.69), but the fade occurs *inside the
+> opening auction* (9:15 print), which is unreachable. Realistic entry at 9:30
+> is significantly negative (t −3.1 to −3.7) — the gap then continues, not
+> reverts. The +64% "gross" was a fill-realism artifact.
 
 ---
 
@@ -95,7 +101,41 @@ entirely on real execution cost being comfortably below ~17 bps.**
 - **Single year, daily-bar proxy:** evidence uses daily open as the entry price.
   Intraday data may show worse fills than the open print implies.
 
-## 7. Reusable tools built for this
+## 8. Intraday validation result — REJECTION (2026-06)
+
+Tested on real 15-min bars via `scripts/gap_fade_intraday.py`, which models
+entry/exit timing instead of the daily open-print proxy.
+
+Broad universe (28 large/mid-caps), 6 months (2025-12 → 2026-05), 120 days,
+k=5/leg, 15 bps round-trip:
+
+| Entry | Exit | Net ann. | t | Sharpe |
+|-------|------|----------|---|--------|
+| open(auction) — control | close | −23.1% | −0.82 | −1.19 |
+| **open (9:30)** | close | **−48.8%** | **−3.15** | −4.56 |
+| open+15m | close | −49.1% | −3.33 | −4.83 |
+| open+30m | close | −46.3% | −3.47 | −5.03 |
+
+Confirmed on a separate 12-large-cap / 90-day slice (realistic entry ~−48%,
+auction control ~−20%). The auction→9:30 gap of ~25%/yr is consistent across
+both runs.
+
+**Why it failed:**
+1. **The fade is an opening-auction phenomenon.** The reversion happens in the
+   9:15 auction print → first minutes. Entering at 9:30 (the earliest realistic
+   continuous-market fill) misses it; thereafter the gap *continues* (intraday
+   momentum), so a fade held to the close loses. The ~25%/yr gap between the
+   auction-print control and 9:30 entry is exactly this unreachable return.
+2. **Costs.** Even the (unreachable) auction-print entry is net break-even to
+   negative once daily round-trip costs are applied.
+
+**The lesson (added to GUIDELINES):** a strong *daily-bar* IC says nothing about
+tradability if the return accrues at a price/time you cannot transact. Always
+validate the entry/exit **timing** on intraday bars before trusting a daily-bar
+backtest of an intraday strategy. The +64% daily "gross" was the open-auction
+print + whole-session hold — a fill-realism mirage (GUIDELINES §3c).
+
+## 9. Reusable tools built for this
 
 - `scripts/feature_ic.py` — per-feature information coefficient screen.
 - `scripts/reversal_test.py` — long/short reversal with break-even cost.

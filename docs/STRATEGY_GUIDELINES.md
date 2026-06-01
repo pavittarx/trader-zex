@@ -356,6 +356,7 @@ If you see any of these, investigate before trusting the result.
 | Performance collapses outside the backtest window | Overfitting / regime-specific |
 | Cost sensitivity: 2× cost → unprofitable | No margin of safety |
 | Position sizing produces > 20% notional in one name | Uncapped sizing bug |
+| Strong daily-bar IC for an *intraday* strategy | Return may accrue at the open-auction print or a minute you can't trade — validate entry/exit timing on intraday bars before trusting it (see GAP_FADE_THESIS §8) |
 
 ---
 
