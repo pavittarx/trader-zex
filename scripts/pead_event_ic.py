@@ -76,7 +76,7 @@ def events_for(close: pd.Series, dates: list[pd.Timestamp], horizons: list[int])
         if t < 1 or t >= len(idx):
             continue
         reaction = close.iloc[t] / close.iloc[t - 1] - 1   # move into the reaction day
-        rec = {"reaction": float(reaction)}
+        rec = {"reaction": float(reaction), "date": idx[t]}
         ok = True
         for h in horizons:
             if t + h >= len(close):
@@ -134,6 +134,28 @@ def main() -> None:
         ls = ls[sign != 0]
         t = ls.mean() / (ls.std() / np.sqrt(len(ls))) if ls.std() > 0 else 0.0
         print(f"{h:>8}{ic:>+17.4f}{ic_t:>+7.2f}   | {ls.mean()*100:+6.2f}%  t={t:+.2f}  n={len(ls)}")
+    # --- Sub-period robustness: does the drift hold in BOTH halves? ---
+    if "date" in df.columns:
+        med = df["date"].sort_values().iloc[len(df) // 2]
+        h1 = df[df["date"] <= med]
+        h2 = df[df["date"] > med]
+        print(f"\nSub-period split at {pd.Timestamp(med).date()}  "
+              f"(H1 n={len(h1)}, H2 n={len(h2)}) — sign L/S mean drift, t:")
+        print(f"{'horizon':>8}{'H1 drift':>12}{'H1 t':>7}{'H2 drift':>12}{'H2 t':>7}")
+        for h in args.horizons:
+            col = f"drift_{h}"
+            def ls(sub):
+                s = sub[["reaction", col]].dropna()
+                sign = np.sign(s["reaction"]); v = (s[col] * sign)[sign != 0]
+                if len(v) < 10:
+                    return None
+                t = v.mean() / (v.std() / np.sqrt(len(v))) if v.std() > 0 else 0.0
+                return v.mean() * 100, t
+            a, b = ls(h1), ls(h2)
+            if a and b:
+                print(f"{h:>8}{a[0]:>+11.2f}%{a[1]:>+7.2f}{b[0]:>+11.2f}%{b[1]:>+7.2f}")
+        print("\nHolds in BOTH halves = robust. Works in only one = period-specific (fragile).")
+
     print("\nPositive IC = drift continues (underreaction/PEAD). The sign L/S is the")
     print("tradable form: hold N days; net of ~15-25 bps cost spread over the move.")
 
