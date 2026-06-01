@@ -181,13 +181,20 @@ def _from_positions(positions_df: pd.DataFrame, instrument_id: str | None = None
         dd = cum - roll_max
         metrics["max_drawdown_inr"] = round(float(dd.min()), 2)
 
-        # Parse commissions (same "2910.00 INR" string format, may be "[2910.00 INR]")
+        # Parse commissions. NT 1.226 reports this as a list of Money strings,
+        # e.g. ['740.42 INR'] (one entry per currency). Sum all entries per row.
         if "commissions" in df.columns:
             def _parse_cost(val) -> float:
-                try:
-                    return float(str(val).strip("[]").split()[0])
-                except (ValueError, IndexError):
-                    return float("nan")
+                items = val if isinstance(val, (list, tuple)) else [val]
+                total = 0.0
+                found = False
+                for item in items:
+                    try:
+                        total += float(str(item).strip("[]'\" ").split()[0])
+                        found = True
+                    except (ValueError, IndexError):
+                        continue
+                return total if found else float("nan")
             costs = df["commissions"].apply(_parse_cost).dropna()
             metrics["total_cost_inr"] = round(float(costs.sum()), 2)
             gross = abs(metrics.get("total_pnl_inr") or 0) + float(costs.sum())

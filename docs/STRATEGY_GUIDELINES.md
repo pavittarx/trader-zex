@@ -356,3 +356,132 @@ If you see any of these, investigate before trusting the result.
 | Performance collapses outside the backtest window | Overfitting / regime-specific |
 | Cost sensitivity: 2× cost → unprofitable | No margin of safety |
 | Position sizing produces > 20% notional in one name | Uncapped sizing bug |
+
+---
+
+## 10. Case study — HMM-confluence strategy postmortem (2026-06)
+
+A worked example of the principles above, from a real backtest of
+`HMMConfluenceStrategy`. Recorded so future strategies don't repeat the same
+failures. **None of the symbols tested were profitable** — but the value is in
+*why*, and which failures were bugs vs. which were absence-of-edge.
+
+### Setup
+- 15-min entries gated by 60-min HMM regime; ranker's top-5 picks, then all 30
+  `ALL_SYMBOLS`; 90-day window (2026-03 → 2026-05); shorts enabled.
+
+### Headline result
+| Metric | Value |
+|--------|-------|
+| Symbols profitable | 0 / 29 (full run), 0 / 5 (top-5 run) |
+| Mean return (90d) | −5.8% (all) / −9.3% (top-5) |
+| Win rate | ~5–11% |
+| Profit factor | ~0.07 |
+| Trades to land one win | **~19:1** |
+| Avg win : avg loss | **~0.6 : 1** (winners *smaller* than losers) |
+| Cost as % of gross P&L | **~48%** |
+
+### Failure modes observed (each maps to a section above)
+
+1. **Regime label churn → noise signal** (§4a). The HMM was refit cold on an
+   *expanding* window every bar; EM landed on a different local optimum each
+   time, so "Bullish" at bar *i* ≠ "Bullish" at bar *i+1*. Measured **50–64%
+   label-flip rate** (the code flags >20% as instability). Entries fired on
+   random flickers.
+   **Fix that worked:** warm-start each refit from the previous bar's params
+   (`HMMModel(warm_start=True)`) + cap the window (`HMM_MAX_WINDOW=500`).
+   60-min flip rate dropped **55% → 13%**. *Necessary but not sufficient* — the
+   strategy still lost. Stabilizing a signal does not give it edge.
+
+2. **No re-entry cooldown → overtrading** (§5 stop discipline, §3c). The worst
+   blow-up (WIPRO: **398 trades**, −31%) had the *lowest* regime churn of the
+   group. Cause: when the regime sits Bullish and the 15m signal stays STRONG
+   BUY, the strategy re-enters the bar after every stop-out, looping until EOD.
+   **Lesson:** a persistent signal + tight stop + no cooldown = death by a
+   thousand cuts. Always gate re-entry on a cooldown or a *signal change*, not
+   signal *presence*.
+
+3. **Costs ~48% of gross** (§2). Direct consequence of #2. At ~25–37 bps/leg,
+   overtrading made costs structurally fatal regardless of signal. A strategy
+   trading 75–400×/90d per name cannot survive NSE costs.
+
+4. **Inverted payoff** (§5). Avg win < avg loss (~0.6:1) *and* a 5% hit rate —
+   negative on both axes. Cause: `TAKE PROFIT`/regime-flip exits cut winners
+   early while stops + EOD-flatten realized full losses. **Lesson:** asymmetric
+   exits must favor the winner (let it run via trailing/ATR target), not the
+   loser. To break even at a 5% hit rate you'd need ~17:1 payoff; we had 0.6:1.
+
+5. **Caught between intraday and swing** (§5). Support-based (positional-scale)
+   stops combined with a 15:15 EOD flatten — neither a clean scalper nor a swing
+   system. Pick one horizon and make stops/targets/exits consistent with it.
+
+6. **Entry filter too loose** (§4b). `signal_15m` was STRONG BUY ~69% of bars.
+   A condition that's true two-thirds of the time selects almost nothing.
+
+### Infrastructure bugs found (separate from strategy edge)
+- **Commission silently reported as ₹0.** The NT positions report returns
+  `commissions` as a *list* (`['740.42 INR']`); the parser did
+  `str(val).strip("[]").split()[0]` → `"'740.42"` → `float()` failed → NaN → 0.
+  Costs *were* charged (realized_pnl is net) but invisible in the report. **A
+  cost column reading exactly 0.0 is a red flag — verify the parser, not the
+  fees.** (§2)
+- **Ranker crashes on an empty universe.** On non-trading days the Nifty-500
+  filter returns 0 symbols → empty `scores_df` → `KeyError: 'direction'`. Guard
+  selection code against empty inputs.
+- **Log spam dominated output.** hmmlearn emitted 60–80% of all log lines as
+  benign "not converging" messages (through its *logger*, not the warnings
+  module). Silenced via `logging.getLogger("hmmlearn").setLevel(logging.ERROR)`.
+
+### The meta-lesson
+The strategy had **two independent problems**: mechanical bugs that bleed money
+(overtrading, inverted payoff, costs) and an **unverified entry edge**. Fixing
+the bugs can move the result from −9% toward break-even, but cannot make it
+*positive* — that requires the signal to actually predict forward returns.
+**Before polishing execution, run the edge test** (`scripts/ranker_ic.py`,
+rank-IC vs forward return — §4c, §6). If mean IC ≤ 0, the features (here: only
+log-return + range-ratio) are the problem, and no amount of stop/cost tuning
+will save it. Order of operations: **prove edge first, then fix execution.**
+
+### Edge verification — what the tests actually showed
+We then ran the edge tests. They are the most important part of this case study.
+
+1. **Ranker-IC = no edge.** `scripts/ranker_ic.py` (point-in-time score vs
+   next-day return, Spearman): **mean IC −0.008, t −0.06**, IC>0 on 45% of days.
+   The composite score is statistically indistinguishable from random. This,
+   not the backtest P&L, is the root finding: the signal carries no information.
+
+2. **The mechanical fixes behaved exactly as theory predicts.** Re-running the
+   fixed strategy: mean return −9.3% → −5.0%, WIPRO's runaway 398→177 trades.
+   But **profit factor (0.07) and cost ratio (49%) were unchanged.** Execution
+   fixes cut the *loss rate*; they cannot create edge. Proof, in one experiment,
+   that you cannot tune your way out of a zero-IC signal.
+
+3. **Feature screen (`scripts/feature_ic.py`).** Tested 9 candidate daily
+   features individually. The HMM's own inputs were confirmed dead
+   (`range_ratio` IC≈0, `ret_1d/5d` slightly negative). One lead appeared —
+   volume z-score, IC +0.056 on 8 symbols — then **flipped to −0.019 when
+   widened to 28 symbols.** A small-sample mirage.
+
+4. **Reversal lead, killed out-of-sample (`scripts/reversal_test.py`).** A
+   1-day reversal long/short (long losers, short winners) looked great over a
+   5-month window: gross +36% ann, Sharpe 1.3. Two problems killed it:
+   (a) break-even cost was only ~12 bps at the 1-day turnover it needed vs
+   ~25–50 bps real cost; (b) extended to a **full year it vanished entirely**
+   (gross −0.3%, t −0.02; sign even flipped at 5-day hold). The 5-month result
+   was a regime artifact.
+
+### The lesson that generalizes beyond this strategy
+**Promising signals on small samples evaporate when you add data — we saw it
+twice (volume z-score, then reversal).** This is the single most important
+research habit: *test cheap and small to generate candidates, but never trust a
+lead until it survives a wider universe AND an out-of-sample window.* The cost
+of catching both mirages was a few daily-data fetches; the cost of not catching
+them would have been a deployed losing strategy.
+
+**Final verdict for this approach:** no robust tradable edge exists on NSE
+large-caps using daily price/volume features, in either direction (momentum
+loses, reversal is period-specific and cost-killed). A future attempt needs a
+genuinely different ingredient — higher-dispersion universe (mid/small-caps),
+different data (intraday microstructure, events, fundamentals), or a
+low-turnover horizon where costs stop dominating — **not** a different model on
+the same inputs.

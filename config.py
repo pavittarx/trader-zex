@@ -19,11 +19,14 @@ TOKEN_FILE = Path("~/.fyers_token.json").expanduser()
 
 # --- HMM Configuration ---
 HMM_N_STATES = 3
-HMM_N_ITER = 1000
+HMM_N_ITER = 1000          # EM iterations for a cold (first) fit
+HMM_WARM_ITER = 25         # EM iterations for warm refits (seeded from prior solution)
 HMM_RANDOM_STATE = 42
 # Minimum bars required to fit the model reliably
 HMM_MIN_SAMPLES = 100
-HMM_MAX_WINDOW: int | None = None  # None = expanding window (current); set to e.g. 500 for rolling
+# Rolling window cap. Bounded window (vs. expanding) keeps the regime stationary,
+# preserves state identity across warm fits, and makes per-bar refit O(1) not O(N).
+HMM_MAX_WINDOW: int | None = 500
 
 # --- Screener Defaults ---
 ALL_SYMBOLS = [
@@ -162,7 +165,15 @@ BACKTEST_SIGNAL_WARMUP: int = HMM_MIN_SAMPLES   # bars needed before first signa
 BACKTEST_ALLOW_SHORTS: bool = False  # NSE cash-segment intraday short (MIS) must square off same day;
                                       # no F&O lot sizes, borrow cost, or hard broker cut-off are modeled.
                                       # Use False for any realistic cash-segment backtest.
-BACKTEST_REGIME_STABILITY_BARS: int = 2         # require N consecutive signals agreeing before entry
+BACKTEST_REGIME_STABILITY_BARS: int = 4         # require N consecutive signals agreeing before entry
+                                                # (raised from 2: a 2-bar gate barely filters regime
+                                                # whipsaw — see docs/STRATEGY_GUIDELINES.md §10)
+BACKTEST_REENTRY_COOLDOWN_BARS: int = 4         # bars to wait after a position closes before re-entering
+                                                # the same symbol — kills the persistent-signal re-entry
+                                                # loop (the WIPRO 398-trade blowup, guidelines §10 #2)
+BACKTEST_TRAIL_PCT: float = 0.01                # trailing-stop distance once in profit. Lets winners run
+                                                # instead of exiting early on the TAKE-PROFIT signal
+                                                # (fixes inverted avg-win<avg-loss payoff, guidelines §10 #4)
 BACKTEST_MAX_POSITION_PCT: float = 0.10         # max 10% of equity in one position
 BACKTEST_MAX_PARTICIPATION: float = 0.05        # max 5% of bar volume
 BACKTEST_MAX_GROSS_EXPOSURE: float = 0.80       # max 80% of equity deployed at once
