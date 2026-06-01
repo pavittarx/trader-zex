@@ -1,8 +1,12 @@
 # Strategy Thesis — Post-Earnings-Announcement Drift (PEAD), NSE
 
-Status: **LIVE CANDIDATE (2026-06)** — first signal to survive a scaling test.
-Promising and economically meaningful net of cost, but not yet validated
-out-of-sample. Documented per `STRATEGY_GUIDELINES.md` §9.
+Status: **MARGINAL CANDIDATE (2026-06)** — real but universe-dependent. The
+per-event drift is genuine and survived scaling/sub-period tests, but the
+portfolio Sharpe halved (1.10 → 0.51) when the universe was broadened from 47 to
+90 names: PEAD concentrates in less-efficient mid/small-caps and is weak in
+liquid blue-chips (matches the literature). Tradable edge lives where liquidity
+is worst — a capacity/cost tradeoff. Not validated cross-regime. Documented per
+`STRATEGY_GUIDELINES.md` §9.
 
 ## 1. Edge hypothesis
 > Investors underreact to earnings news; a stock's earnings-day move continues
@@ -63,6 +67,37 @@ is the better signal. A fundamental-surprise angle needs a deeper data source
 - **Universe:** liquid large/mid-caps. Shorts via MIS/F&O constraints apply.
 - **Sizing:** equal-risk per event; standard caps (GUIDELINES §3e, §5).
 
+## 3b. Portfolio backtest (2026-06) — `scripts/pead_backtest.py`
+Equal-weight active book (target 10 positions = full investment), |reaction|≥2%,
+enter reaction-day close, hold H, exit close, 20 bps round-trip. 47 names, ~2yr,
+89 trades.
+
+| Hold | CAGR | Sharpe | maxDD | Active days |
+|------|------|--------|-------|-------------|
+| 1 day  | +1.1% | +0.78 | −1.1% | 10% |
+| 5 day  | +0.5% | +0.21 | −2.5% | 22% |
+| 20 day | **+5.2%** | **+1.10** | **−3.0%** | 36% |
+
+**The edge survives portfolio assembly** (Sharpe ~1.1 on these 47, shallow DD,
+net of cost) — but see the capacity test below: it does NOT generalize at the
+same strength to a broader universe.
+
+### Capacity test (2026-06) — scaling the universe DILUTED it
+Re-ran on 90 names (added ~43 liquid blue-chips), 156 trades:
+
+| Universe (20-day hold) | Trades | CAGR | Sharpe | maxDD |
+|------------------------|--------|------|--------|-------|
+| 47 names (mid-cap-heavy) | 89 | +5.2% | **+1.10** | −3.0% |
+| 90 names (+ blue-chips)  | 156 | +3.1% | **+0.51** | −7.0% |
+
+Sharpe halved, drawdown doubled. The added blue-chips have **weak PEAD** (priced
+efficiently); the original 47 skewed mid-cap/volatile where PEAD is strong. This
+matches the literature (drift concentrates in small/illiquid/low-coverage names)
+and means the edge **does not scale by adding liquid names** — it lives where
+liquidity (and thus tradability) is worst. The 47-name Sharpe 1.1 was partly a
+favourable-universe artifact. Realistic assessment: a **marginal** effect
+(broad-universe Sharpe ~0.5), strongest in hard-to-trade names.
+
 ## 4. Net-of-cost margin
 20-day form: +1.17% gross/trade − ~15–25 bps round-trip ≈ **+95 bps/trade**.
 Low turnover means cost is paid rarely and dwarfed by the move — the opposite of
@@ -82,3 +117,27 @@ the daily-rebalance signals.
 ## 6. Tools
 - `scripts/pead_event_ic.py` — the event-study IC harness (chunked daily fetch,
   t+1 reaction alignment).
+
+## 8. Fundamental-surprise attempt (2026-06) — negative, instructive
+Scraped deep quarterly EPS from screener.in (`scripts/screener_data.py`, ~13
+quarters/symbol vs nse's 5) to test a real YoY earnings surprise
+(`scripts/pead_fundamental.py`, 20 names, 160 events).
+
+| Horizon | IC(SUE) | t | IC(reaction) | t |
+|---------|---------|-----|--------------|-----|
+| 1 day   | +0.020 | +0.25 | −0.134 | −1.70 |
+| 5 day   | +0.054 | +0.68 | −0.234 | −3.03 |
+| 20 day  | −0.073 | −0.92 | −0.133 | −1.68 |
+
+**Verdict: free deeper data does NOT improve PEAD.**
+1. **YoY EPS surprise has no drift signal** (IC≈0). Raw YoY growth is largely
+   *anticipated* — a true "surprise" needs consensus ESTIMATES (actual vs.
+   expected), which screener lacks. The price reaction stays the better proxy.
+2. **Volume-snap dating is unreliable** — it flipped the reaction-IC negative,
+   contradicting the validated nse-exact-date study (+0.18). screener has no
+   clean announcement dates; snapping to the max-volume day mis-dates events.
+
+**Implication for data spend:** the missing ingredient is consensus estimates
+(paid: Trendlyne / EODHD / IBES), NOT more EPS history. Don't pursue further
+free-fundamental refinements. The validated price-reaction PEAD (§2–3b) — real
+but marginal, universe-dependent — remains the best form.
