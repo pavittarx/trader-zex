@@ -6,7 +6,12 @@ state the edge + who's wrong, then test IC cheaply, then validate entry/exit
 **timing on intraday bars** before trusting anything (the gap-fade lesson —
 `GAP_FADE_THESIS.md` §8).
 
-Status: parked (research paused 2026-06). Tools to reuse live in `scripts/`:
+Status: ACTIVE — PEAD candidate under validation (2026-06).
+> **UPDATE (2026-06): first live candidate found — PEAD.** Earnings-reaction
+> drift survived scaling (44→186 events, t≈2.5) where price/volume leads did
+> not. Low-turnover, cost math works. See `PEAD_THESIS.md`. Needs OOS.
+
+Prior parked items below. Tools to reuse live in `scripts/`:
 `feature_ic.py`, `intraday_edge.py`, `gap_fade_test.py`, `gap_fade_intraday.py`,
 `breakout_test.py`.
 
