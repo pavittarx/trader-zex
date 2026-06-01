@@ -1,8 +1,12 @@
 # Strategy Thesis — Post-Earnings-Announcement Drift (PEAD), NSE
 
-Status: **LIVE CANDIDATE (2026-06)** — first signal to survive a scaling test.
-Promising and economically meaningful net of cost, but not yet validated
-out-of-sample. Documented per `STRATEGY_GUIDELINES.md` §9.
+Status: **MARGINAL CANDIDATE (2026-06)** — real but universe-dependent. The
+per-event drift is genuine and survived scaling/sub-period tests, but the
+portfolio Sharpe halved (1.10 → 0.51) when the universe was broadened from 47 to
+90 names: PEAD concentrates in less-efficient mid/small-caps and is weak in
+liquid blue-chips (matches the literature). Tradable edge lives where liquidity
+is worst — a capacity/cost tradeoff. Not validated cross-regime. Documented per
+`STRATEGY_GUIDELINES.md` §9.
 
 ## 1. Edge hypothesis
 > Investors underreact to earnings news; a stock's earnings-day move continues
@@ -74,13 +78,25 @@ enter reaction-day close, hold H, exit close, 20 bps round-trip. 47 names, ~2yr,
 | 5 day  | +0.5% | +0.21 | −2.5% | 22% |
 | 20 day | **+5.2%** | **+1.10** | **−3.0%** | 36% |
 
-**The edge survives portfolio assembly** (Sharpe ~1.1, shallow drawdowns, net of
-cost) — quality is good. But it is **low-capacity**: only 36% of days invested
-(1-day: 10%), because 47 names × ~4 events/yr is too few concurrent events to
-deploy capital. CAGR is modest for that reason, NOT signal weakness. Lever to
-scale: more names → more concurrent events → higher utilization at ~same Sharpe.
-Caveats: 89 trades / one ~2yr regime (wide error bars); close-to-close model,
-not execution-grade fills.
+**The edge survives portfolio assembly** (Sharpe ~1.1 on these 47, shallow DD,
+net of cost) — but see the capacity test below: it does NOT generalize at the
+same strength to a broader universe.
+
+### Capacity test (2026-06) — scaling the universe DILUTED it
+Re-ran on 90 names (added ~43 liquid blue-chips), 156 trades:
+
+| Universe (20-day hold) | Trades | CAGR | Sharpe | maxDD |
+|------------------------|--------|------|--------|-------|
+| 47 names (mid-cap-heavy) | 89 | +5.2% | **+1.10** | −3.0% |
+| 90 names (+ blue-chips)  | 156 | +3.1% | **+0.51** | −7.0% |
+
+Sharpe halved, drawdown doubled. The added blue-chips have **weak PEAD** (priced
+efficiently); the original 47 skewed mid-cap/volatile where PEAD is strong. This
+matches the literature (drift concentrates in small/illiquid/low-coverage names)
+and means the edge **does not scale by adding liquid names** — it lives where
+liquidity (and thus tradability) is worst. The 47-name Sharpe 1.1 was partly a
+favourable-universe artifact. Realistic assessment: a **marginal** effect
+(broad-universe Sharpe ~0.5), strongest in hard-to-trade names.
 
 ## 4. Net-of-cost margin
 20-day form: +1.17% gross/trade − ~15–25 bps round-trip ≈ **+95 bps/trade**.

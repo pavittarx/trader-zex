@@ -52,7 +52,7 @@ def result_dates(sym_plain: str) -> list[pd.Timestamp]:
         raw = n.nse_past_results(sym_plain)
     except Exception:
         return []
-    rows = raw.get("resCmpData", []) if isinstance(raw, dict) else []
+    rows = (raw.get("resCmpData") or []) if isinstance(raw, dict) else []
     out = []
     for r in rows:
         dt = r.get("re_create_dt")
