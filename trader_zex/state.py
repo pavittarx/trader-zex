@@ -166,7 +166,6 @@ class AppState(rx.State):
         self.access_token = ""
         self.auth_code = ""
         self.auth_url = fyers_auth.build_auth_url()
-        self.table_html = ""
         self.symbol_times = {}
         self.is_running = False
         self.auto_refresh = False

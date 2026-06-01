@@ -84,7 +84,10 @@ def _compute(
     df_60m: pd.DataFrame,
     warmup: int,
 ) -> list[dict]:
-    hmm = HMMModel()
+    # Separate HMM instances per timeframe: each carries its own warm-start
+    # state across bars, so 15-min and 60-min fits never seed each other.
+    hmm_15m = HMMModel(warm_start=True)
+    hmm_60m = HMMModel(warm_start=True)
     det = StructureDetector()
     timestamps = df_15m.index.tolist()
     n = len(timestamps)
@@ -110,7 +113,7 @@ def _compute(
             continue
 
         try:
-            hmm_15 = hmm.detect_regime(window_15, max_window=config.HMM_MAX_WINDOW)
+            hmm_15 = hmm_15m.detect_regime(window_15, max_window=config.HMM_MAX_WINDOW)
             struct = det.detect(window_15)
             signal = generate_signal(hmm_15.current_regime, struct.location)
             regime_15 = hmm_15.current_regime
@@ -121,7 +124,7 @@ def _compute(
             continue
 
         try:
-            hmm_60 = hmm.detect_regime(window_60, max_window=config.HMM_MAX_WINDOW)
+            hmm_60 = hmm_60m.detect_regime(window_60, max_window=config.HMM_MAX_WINDOW)
             regime_60 = hmm_60.current_regime
         except Exception:
             regime_60 = regime_15
@@ -164,7 +167,8 @@ def make_cache_key(symbol: str, date_from: object, date_to: object) -> str:
     This ensures stale signals are not reused when HMM or structure config changes.
     """
     cfg_str = (
-        f"{config.HMM_N_STATES}_{config.HMM_RANDOM_STATE}_"
+        f"{config.HMM_N_STATES}_{config.HMM_RANDOM_STATE}_{config.HMM_MAX_WINDOW}_"
+        f"{config.HMM_WARM_ITER}_"
         f"{config.STRUCTURE_METHOD}_{config.STRUCTURE_ATR_PERIOD}_"
         f"{config.STRUCTURE_EMA_PERIOD}_{config.STRUCTURE_ATR_MULT}_"
         f"{config.STRUCTURE_PROXIMITY_PCT}"

@@ -65,6 +65,8 @@ class HMMStrategyConfig(StrategyConfig, frozen=True):
     eod_exit_minute: int = config.BACKTEST_EOD_EXIT_MINUTE_IST
     allow_shorts: bool = config.BACKTEST_ALLOW_SHORTS
     regime_stability_bars: int = config.BACKTEST_REGIME_STABILITY_BARS
+    reentry_cooldown_bars: int = config.BACKTEST_REENTRY_COOLDOWN_BARS
+    trail_pct: float = config.BACKTEST_TRAIL_PCT
     max_position_pct: float = config.BACKTEST_MAX_POSITION_PCT
     max_participation: float = config.BACKTEST_MAX_PARTICIPATION
     max_gross_exposure: float = config.BACKTEST_MAX_GROSS_EXPOSURE
@@ -92,6 +94,13 @@ class HMMConfluenceStrategy(Strategy):
         # Only manually-tracked state (portfolio handles position side)
         self._stop_price: float | None = None
         self._trade_count = 0
+        # Entry price + favorable-excursion watermark drive the trailing stop.
+        self._entry_price: float | None = None
+        self._high_water: float | None = None   # long: highest high since entry
+        self._low_water: float | None = None    # short: lowest low since entry
+        # Re-entry cooldown: block new entries until this bar index.
+        self._bar_count = 0
+        self._cooldown_until_bar = 0
 
     # ------------------------------------------------------------------
     # NautilusTrader lifecycle
@@ -104,6 +113,7 @@ class HMMConfluenceStrategy(Strategy):
         if bar.bar_type != self._bar_type:
             return
 
+        self._bar_count += 1
         close = float(bar.close)
         ts_ist = _bar_ts_to_ist(bar.ts_event)
 
@@ -125,28 +135,39 @@ class HMMConfluenceStrategy(Strategy):
         signal_15 = sig.get("signal_15m", "NEUTRAL")
         support = sig.get("support", 0.0)
         resistance = sig.get("resistance", 0.0)
-        location = sig.get("location", "In Middle")
 
         # --- Exit existing position first ---
+        # The TAKE-PROFIT / At-Support signal exits were removed: they capped
+        # winners early and produced an inverted payoff (avg win < avg loss,
+        # guidelines §10 #4). Winners now run under a trailing stop; we still
+        # exit on a regime flip (the thesis) or the (trailed) stop.
         if is_long:
+            self._update_trailing_stop_long(bar)
             # Check intrabar touch (bar.low) AND closing price to avoid optimistic fills
             stop_hit = self._stop_price is not None and (
                 float(bar.low) <= self._stop_price or close <= self._stop_price
             )
-            if signal_15 == "TAKE PROFIT" or regime_60 == "Bearish" or stop_hit:
+            if regime_60 == "Bearish" or stop_hit:
                 self._close_position(f"LONG_EXIT ({signal_15})")
                 return
 
         elif is_short:
+            self._update_trailing_stop_short(bar)
             stop_hit = self._stop_price is not None and (
                 float(bar.high) >= self._stop_price or close >= self._stop_price
             )
-            if location == "At Support" or regime_60 == "Bullish" or stop_hit:
+            if regime_60 == "Bullish" or stop_hit:
                 self._close_position(f"SHORT_EXIT ({signal_15})")
                 return
 
         # --- Entry ---
         if not has_position:
+            # Re-entry cooldown: after a position closes, wait N bars before
+            # opening a new one. Prevents the persistent-signal re-entry loop
+            # that produced runaway trade counts (guidelines §10 #2).
+            if self._bar_count < self._cooldown_until_bar:
+                return
+
             if (
                 regime_60 == "Bullish"
                 and signal_15 in {"STRONG BUY", "WEAK BUY"}
@@ -163,6 +184,8 @@ class HMMConfluenceStrategy(Strategy):
                     )
                     self.submit_order(order)
                     self._stop_price = stop_level
+                    self._entry_price = close
+                    self._high_water = close
                     self._trade_count += 1
 
             elif (
@@ -182,18 +205,52 @@ class HMMConfluenceStrategy(Strategy):
                     )
                     self.submit_order(order)
                     self._stop_price = stop_level
+                    self._entry_price = close
+                    self._low_water = close
                     self._trade_count += 1
 
     def on_order_rejected(self, event: OrderRejected) -> None:
         """Called when an order is rejected — roll back manual state."""
         self.log.info(f"Order rejected: {event.reason}. Resetting stop and decrementing trade count.")
-        self._stop_price = None
+        self._reset_trade_state()
         self._trade_count = max(0, self._trade_count - 1)
 
     def on_position_closed(self, event: PositionClosed) -> None:
-        """Called when a position is fully closed — reset stop price."""
+        """Called when a position is fully closed — reset trade state and arm cooldown."""
         if event.instrument_id == self._iid:
-            self._stop_price = None
+            self._reset_trade_state()
+            self._cooldown_until_bar = self._bar_count + self.config.reentry_cooldown_bars
+
+    def _reset_trade_state(self) -> None:
+        self._stop_price = None
+        self._entry_price = None
+        self._high_water = None
+        self._low_water = None
+
+    def _update_trailing_stop_long(self, bar: Bar) -> None:
+        """Ratchet the long stop up once the trade is in profit; never lowers it.
+
+        Trailing only activates after price advances trail_pct beyond entry, so
+        the initial structure-based stop (and the risk it sized) stays intact
+        until the trade is working.
+        """
+        if self._high_water is None or self._entry_price is None or self.config.trail_pct <= 0:
+            return
+        self._high_water = max(self._high_water, float(bar.high))
+        if self._high_water >= self._entry_price * (1 + self.config.trail_pct):
+            trail = self._high_water * (1 - self.config.trail_pct)
+            if self._stop_price is not None:
+                self._stop_price = max(self._stop_price, trail)
+
+    def _update_trailing_stop_short(self, bar: Bar) -> None:
+        """Ratchet the short stop down once the trade is in profit; never raises it."""
+        if self._low_water is None or self._entry_price is None or self.config.trail_pct <= 0:
+            return
+        self._low_water = min(self._low_water, float(bar.low))
+        if self._low_water <= self._entry_price * (1 - self.config.trail_pct):
+            trail = self._low_water * (1 + self.config.trail_pct)
+            if self._stop_price is not None:
+                self._stop_price = min(self._stop_price, trail)
 
     def on_stop(self) -> None:
         if self.portfolio.is_net_long(self._iid) or self.portfolio.is_net_short(self._iid):
