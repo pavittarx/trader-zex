@@ -75,7 +75,7 @@ def day_prices(intraday: pd.DataFrame, entry_off: int, exit_off: int) -> pd.Data
 
 
 def run(panel: dict[str, pd.DataFrame], k: int, rt_bps: float,
-        entry_off: int, exit_off: int) -> dict | None:
+        entry_off: int, exit_off: int, direction: str = "fade") -> dict | None:
     per_sym = {s: day_prices(df, entry_off, exit_off) for s, df in panel.items()}
     gap = pd.DataFrame({s: d["gap"] for s, d in per_sym.items()})
     # intraday leg return entry->exit, per symbol per day
@@ -90,7 +90,10 @@ def run(panel: dict[str, pd.DataFrame], k: int, rt_bps: float,
         if len(common) < 2 * k:
             continue
         g = g[common].sort_values()
-        longs, shorts = g.index[:k], g.index[-k:]
+        # fade: long gap-downs (low g), short gap-ups (high g).
+        # momentum: the opposite — long gap-ups, short gap-downs.
+        low, high = g.index[:k], g.index[-k:]
+        longs, shorts = (low, high) if direction == "fade" else (high, low)
         pnl = r[longs].mean() - r[shorts].mean() - rt   # one round trip / leg / day
         daily.append(pnl)
     if len(daily) < 20:
@@ -110,6 +113,7 @@ def main() -> None:
     p.add_argument("--resolution", default="15")
     p.add_argument("--k", type=int, default=3)
     p.add_argument("--rt-bps", type=float, default=15.0)
+    p.add_argument("--direction", choices=("fade", "momentum"), default="fade")
     args = p.parse_args()
 
     client = FyersClient()
@@ -125,9 +129,10 @@ def main() -> None:
     print(f"\n{'entry':>12}{'exit':>14}{'net_ann%':>10}{'t':>7}{'Sharpe':>8}{'win%':>6}{'days':>6}")
     # eo=-1: fill at 9:15 open-auction print (daily proxy / control).
     # eo>=0: enter at close of that many bars after the open (realistic). (15m bars: 1≈+15min)
+    print(f"direction={args.direction}")
     for eo in (-1, 0, 1, 2):
         for xo in (0, 1):
-            r = run(panel, args.k, args.rt_bps, eo, xo)
+            r = run(panel, args.k, args.rt_bps, eo, xo, args.direction)
             if r:
                 etxt = "open(auction)" if eo < 0 else ("open" if eo == 0 else f"open+{eo*int(args.resolution)}m")
                 xtxt = "close" if xo == 0 else f"close-{xo*int(args.resolution)}m"
