@@ -14,19 +14,27 @@ Status: parked (research paused 2026-06). Tools to reuse live in `scripts/`:
 > net of realistic round-trip cost (~12–25 bps intraday for liquid names). Most
 > intraday effects die on turnover cost — design for low turnover or selectivity.
 
+> **The binding constraint (2026-06, after testing 4 signal families):** every
+> cross-sectional, rebalance-every-day intraday long/short we tested (reversal,
+> gap-fade, gap-continuation) had only a small gross edge (~0–20%/yr) that was
+> eaten by daily round-trip cost (~28%/yr at 15 bps). Continuation: gross ≈ +20%,
+> break-even cost ≈ **8 bps/day**, realistic cost 12–25 bps → net −8.5%. The
+> problem is **structural, not signal discovery**: daily-rebalanced L/S is the
+> highest-turnover design possible. Prioritise future ideas by TURNOVER —
+> selective, few-trades-per-day, high-per-trade-edge setups — not by signal
+> strength alone. Re-prioritised below.
+
 ---
 
-## 1. Intraday continuation / opening-range breakout  *(observation-grounded)*
+## 1. Intraday continuation / opening-range breakout — TESTED, cost-killed
 **Edge:** information diffuses slowly and momentum traders pile in after the
-open, so the early move (and opening range) sets the day's direction. We saw the
-*opposite* of fade post-9:30 — gaps continue — which motivates this directly.
-**Who's wrong:** liquidity providers and faders who get run over by persistent
-informed flow.
-**Test:** cross-sectional IC of the 9:15→9:30 (or opening-range) return vs the
-9:30→close return; then a long/short net of cost. Reuse `gap_fade_intraday.py`
-logic with the sign flipped and entry at 9:30. **Caution:** "do the opposite of
-a losing strategy" is a trap — require it to stand on its own IC + out-of-sample,
-not just as gap-fade's inverse.
+open, so gaps continue intraday.
+**Result (2026-06, broad universe, 6mo, realistic 9:30 entry, 15 bps):** gross
+edge is real and positive (~+20%/yr) — gaps DO continue — but net −8.5% (t −0.42)
+after daily-rebalance cost. Break-even ≈ 8 bps/day; no margin vs 12–25 bps real.
+**Verdict:** as a daily-rebalanced cross-sectional L/S, cost-killed like the
+others. Only worth revisiting in a LOW-TURNOVER form (e.g. only the strongest
+breakouts, held longer / sized larger), not every-name-every-day.
 
 ## 2. Intraday VWAP reversion
 **Edge:** transient order-flow imbalances push price away from VWAP; it reverts
