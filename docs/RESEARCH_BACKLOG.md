@@ -7,7 +7,18 @@ state the edge + who's wrong, then test IC cheaply, then validate entry/exit
 `GAP_FADE_THESIS.md` §8).
 
 Status: parked (research paused 2026-06). Tools to reuse live in `scripts/`:
-`feature_ic.py`, `intraday_edge.py`, `gap_fade_test.py`, `gap_fade_intraday.py`.
+`feature_ic.py`, `intraday_edge.py`, `gap_fade_test.py`, `gap_fade_intraday.py`,
+`breakout_test.py`.
+
+> **Sweep conclusion (2026-06):** six signal families tested (HMM-confluence,
+> momentum, reversal, gap-fade, gap-continuation, compression-breakout) — none
+> tradable. The **simple OHLCV signal space on NSE equities is empty of retail
+> edge**: signals are either ~0 gross, evaporate out-of-sample, accrue at
+> unreachable prices, or have a real gross edge that daily-rebalance cost eats.
+> A step-change is required to progress — richer data (microstructure / options
+> flow / fundamentals / events), better execution (capture spread via limit
+> orders), or a different problem entirely. Further simple-OHLCV variants are
+> expected to fail and are not worth testing.
 
 > **Hard rule learned:** a strong *daily-bar* IC proves nothing tradable. Always
 > confirm the return is reachable at a price/time you can actually transact, and
@@ -51,11 +62,14 @@ semi-predictable directional pressure in the last 30–60 min.
 **Test:** does the late-session (e.g. 14:30→15:00) move or imbalance predict the
 close / next-open? Lower turnover than #2.
 
-## 4. Volatility-compression breakout
-**Edge:** range contraction precedes expansion; a volume surge marks the
-breakout direction.
-**Test:** morning range/volume vs rest-of-day directional move; or NR-day style
-setups. Selective (few signals/day) → cost-friendly.
+## 4. Volatility-compression breakout — TESTED, no gross edge
+**Edge (hypothesised):** range contraction precedes a directional expansion.
+**Result (2026-06, broad universe, 6mo, NR7 → break prior day high/low → hold to
+close, 15 bps):** net −15.2 bps/trade (t −2.24), win 43%, ~36 trades/sym/yr.
+Gross ≈ 0 — breakouts *fail* (revert) more than they follow through to the
+close. Not a cost problem; the premise is wrong for this universe/period.
+**Possible (unlikely) refinement:** trailing-stop exit instead of hold-to-close,
+or volume-confirmed breakouts — but the ~0 gross premise is weak.
 
 ## 5. Index-relative intraday reversion (residual)
 **Edge:** a single stock decouples from its index intraday on idiosyncratic flow,
