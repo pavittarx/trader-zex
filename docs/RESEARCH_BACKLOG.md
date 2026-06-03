@@ -6,10 +6,18 @@ state the edge + who's wrong, then test IC cheaply, then validate entry/exit
 **timing on intraday bars** before trusting anything (the gap-fade lesson —
 `GAP_FADE_THESIS.md` §8).
 
-Status: ACTIVE — PEAD candidate under validation (2026-06).
+Status: ACTIVE — PEAD candidate under validation; cross-sectional momentum
+instrument built (2026-06).
 > **UPDATE (2026-06): first live candidate found — PEAD.** Earnings-reaction
 > drift survived scaling (44→186 events, t≈2.5) where price/volume leads did
 > not. Low-turnover, cost math works. See `PEAD_THESIS.md`. Needs OOS.
+> **UPDATE (2026-06): cross-sectional momentum opened as a second low-turnover
+> lane.** Thesis + self-test-verified harness built (`docs/MOMENTUM_THESIS.md`,
+> `scripts/momentum_ic.py`). Monthly-rebalanced 12-1 momentum directly targets
+> the binding turnover constraint. NOTE: the "momentum" killed in the OHLCV
+> sweep was *intraday/daily-rebalance* — classic monthly 12-1 cross-sectional
+> momentum is a different timescale and was NOT tested. Live in-sample verdict
+> pending a run with reachable daily data.
 
 Prior parked items below. Tools to reuse live in `scripts/`:
 `feature_ic.py`, `intraday_edge.py`, `gap_fade_test.py`, `gap_fade_intraday.py`,
