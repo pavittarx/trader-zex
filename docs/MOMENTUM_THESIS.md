@@ -7,10 +7,13 @@ survivorship with a point-in-time liquidity universe (§11), the honest estimate
 is **L/S net Sharpe ~0.5 / long-only alpha ~0.9%/mo (t 3.2, ~11%/yr) beyond beta**
 on a top-200-by-liquidity universe (2012-2021), robust across both sub-periods and
 2× cost — vs. the survivorship-INFLATED static-universe Sharpe of 0.81 (§10). That
-makes it comparable-to-modestly-better than PEAD (~0.5). **Still gating it:** (a)
-in-sample only — no OOS yet; (b) a −40% momentum-crash tail needing a risk overlay;
-(c) the candidate pool still omits pre-2020 delistings (residual upward bias).
-See §10-§11. Documented per `STRATEGY_GUIDELINES.md` §9.
+makes it comparable-to-modestly-better than PEAD (~0.5). Crash-risk overlays
+(vol-scaling + market-trend filter, §12) lift in-sample Sharpe to ~0.79 BUT do
+**not** cut the ~−40% tail — the dominant drawdown is a 2014-style up-market value
+rotation that bear-market filters miss. **Still gating it:** (a) in-sample only —
+no OOS yet (THE remaining gate); (b) the un-hedged ~−40% rotation tail; (c) the
+candidate pool still omits pre-2020 delistings (residual upward bias).
+See §10-§12. Documented per `STRATEGY_GUIDELINES.md` §9.
 
 ---
 
@@ -239,9 +242,10 @@ broad universe, the same liquidity/efficiency gradient PEAD showed.
 
 ### Next steps (priority order)
 1. ~~Point-in-time universe~~ — **DONE, see §11.**
-2. **Out-of-sample window** (2022-2026 via live Fyers) with the rule frozen — Stage 4.
-3. **Risk overlay** — TS-momentum flat-switch and/or vol-scaling to cut the crash
-   tail; measure the Sharpe improvement.
+2. ~~Risk overlay~~ — **DONE, see §12: lifts Sharpe 0.49→0.79 but does NOT cut the
+   ~−40% tail (an up-market value-rotation crash the standard fixes miss).**
+3. **Out-of-sample window** (2022-2026 via live Fyers) with the rule frozen — the
+   remaining gate (Stage 4). Single 2012-2021 window so far.
 4. Only then a production NautilusTrader portfolio backtest.
 
 ---
@@ -288,5 +292,52 @@ before 2020 are absent entirely, which no PIT filter can recover. So even the
 top-200 Sharpe ~0.5 is a mild *upper* bound. The honest read: **a real, modest,
 tradable momentum edge (Sharpe ~0.4-0.5, long-only alpha ~10%/yr) in a broad
 liquid NSE universe — pending out-of-sample confirmation and a crash-risk overlay.**
+
+---
+
+## 12. Crash-risk overlays — Sharpe improves, the tail does NOT (2026-06)
+
+Two textbook momentum-crash fixes, both look-ahead-free, applied to the PIT
+top-200 L/S book (`momentum_ic.py --overlay`):
+- **Vol-scaling** (Barroso-Santa-Clara): size inversely to trailing-6m realized
+  vol, targeting the book's own long-run vol (stabilize, not leverage).
+- **Market-trend filter** (Daniel-Moskowitz): momentum crashes cluster in
+  bear-market rebounds → hold only when the trailing-12m market return is
+  positive, else flat.
+
+| Variant | ann.ret | vol | Sharpe | maxDD | avg exposure |
+|---------|---------|-----|--------|-------|------|
+| baseline (no overlay) | +10.3% | 21.0% | 0.49 | **−39.7%** | 1.00 |
+| vol-scaled            | +11.2% | 24.3% | 0.46 | −39.1% | 1.29 |
+| market-trend filter   | +13.5% | 18.7% | **0.72** | −39.7% | 0.83 |
+| vol-scaled + trend    | +16.7% | 21.3% | **0.79** | −39.1% | 1.08 |
+
+**The honest finding: the overlays raise risk-adjusted return (Sharpe 0.49 → 0.79)
+but barely touch the dominant tail (maxDD stays ~−39%).** Why — and it's the
+interesting part:
+
+- The defining drawdown is the **2014 momentum crash** (peak Jun-2013 → trough
+  Apr-2014): the pre/post-Modi-election rally rocketed beaten-down PSU/infra/
+  cyclical names, crushing the short leg (Feb-2014 −20.8%, Apr-2014 −18.8%).
+- **The market-trend filter misses it entirely** — the trailing-12m market return
+  was strongly *positive* (+14% to +30%) right through the crash. Daniel-Moskowitz
+  protects against crashes in *down* markets (à la 2009); the 2014 Indian crash was
+  a **style rotation in a roaring up-market**, so the bear filter never fires
+  (exposure stayed 1.0 throughout).
+- **Vol-scaling can't anticipate it** — the Feb-2014 −21% hit while trailing vol
+  was still normal (weight ≈ 1.07); scaling only cut size *after* the first crash
+  month, trimming April slightly (−39.7% → −39.1%). It helps crashes that follow a
+  vol build-up; this one was abrupt.
+
+**Implication.** The Sharpe lift is real but comes from sitting out generally-weak
+stretches (trend filter, avg exposure 0.83) and calm-period stabilization — not
+from crash protection. The ~−40% tail is an **up-market value-rotation crash**,
+a different animal from the US bear-rebound crashes these tools were built for,
+and it remains essentially unhedged here. Possible next angles (untested): a
+short-leg beta cap / dynamic hedge, faster vol estimation, or an
+idiosyncratic-momentum (residual, beta-neutralized) construction — but none is a
+known fix for up-market rotation. *Caveat:* the vol-target level uses full-sample
+vol (cosmetic only — Sharpe/maxDD are scale-invariant, so the verdict is
+unaffected); the 6m/12m windows are unoptimized and their sensitivity is untested.
 </content>
 </invoke>

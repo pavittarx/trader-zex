@@ -288,6 +288,61 @@ def alpha_beta(y: np.ndarray, x: np.ndarray):
     return float(a), float(b), float(t_a)
 
 
+def report_overlay(rec: pd.DataFrame, cost_rt_bps: float = COST_RT_BPS,
+                   vol_window: int = 6, market_months: int = 12,
+                   lev_cap: float = 2.0) -> None:
+    """Crash-risk overlays on the dollar-neutral L/S book, both look-ahead-free:
+      * vol-scaling (Barroso-Santa-Clara): size inversely to trailing realized
+        vol, targeting the book's own long-run vol (stabilize, not leverage).
+      * market-trend filter (Daniel-Moskowitz): momentum crashes cluster in
+        bear-market rebounds -> hold the book only when trailing market return
+        is positive, else go flat.
+    Exposure changes are charged an approximate rescale/switch cost."""
+    legs = quintile_legs(rec).sort_values("reb").reset_index(drop=True)
+    n = len(legs)
+    if n < vol_window + market_months + 4:
+        print("\n(too few rebalances for overlay analysis)")
+        return
+    cost = cost_rt_bps / 1e4
+    to = turnover_series(legs)
+    base = legs["ls_gross"].values - to * cost      # net L/S, no overlay
+    mkt = legs["mkt_ret"].values
+    target = base.std(ddof=1) * np.sqrt(12)          # vol-stabilize to own vol
+
+    # 1) vol-scaling — weight from trailing window, known at t-1 (no look-ahead)
+    w_vol = np.ones(n)
+    for t in range(vol_window, n):
+        sig = base[t - vol_window:t].std(ddof=1) * np.sqrt(12)
+        w_vol[t] = min(lev_cap, target / sig) if sig > 0 else 1.0
+    rescale = np.abs(np.diff(np.concatenate([[1.0], w_vol]))) * cost
+    r_vol = w_vol * base - rescale
+
+    # 2) market-trend filter — bear = trailing market cum-return < 0 (past only)
+    expo = np.ones(n)
+    for t in range(market_months, n):
+        past = np.prod(1.0 + mkt[t - market_months:t]) - 1.0
+        expo[t] = 1.0 if past > 0 else 0.0
+    switch = np.abs(np.diff(np.concatenate([[1.0], expo]))) * cost
+    r_trend = expo * base - switch
+
+    # 3) both
+    w_both = w_vol * expo
+    sw_both = np.abs(np.diff(np.concatenate([[1.0], w_both]))) * cost
+    r_both = w_both * base - sw_both
+
+    print(f"\nCrash-risk overlays on the L/S book (net of {cost_rt_bps:.0f} bps + "
+          f"exposure-change cost; vol_window={vol_window}m, market_filter={market_months}m):")
+    print(f"{'variant':<26}{'ann.ret':>9}{'vol':>7}{'Sharpe':>8}{'maxDD':>8}{'avg expo':>9}")
+    for name, r, e in [("baseline (no overlay)", base, np.ones(n)),
+                       ("vol-scaled", r_vol, w_vol),
+                       ("market-trend filter", r_trend, expo),
+                       ("vol-scaled + trend", r_both, w_both)]:
+        ar, av, sh, dd = annualized(r)
+        print(f"{name:<26}{ar*100:>+8.1f}%{av*100:>6.1f}%{sh:>+8.2f}{dd*100:>+7.1f}%{e.mean():>9.2f}")
+    print("Crash protection works if maxDD shrinks and Sharpe rises vs baseline.")
+
+
+# --------------------------------------------------------------------------- #
 def report(rec: pd.DataFrame, cost_rt_bps: float = COST_RT_BPS, label: str = "") -> dict:
     n_sym = rec["symbol"].nunique()
     n_reb = rec["reb"].nunique()
@@ -416,6 +471,9 @@ def main() -> None:
                         "(--github).")
     p.add_argument("--pit-liq-window", type=int, default=63,
                    help="trailing days for the PIT liquidity median (default ~3mo)")
+    p.add_argument("--overlay", action="store_true",
+                   help="also run crash-risk overlays (vol-scaling + market-trend "
+                        "filter) on the L/S book")
     args = p.parse_args()
 
     if args.self_test:
@@ -456,6 +514,9 @@ def main() -> None:
 
     report(rec, cost_rt_bps=args.cost_bps,
            label=f"LIVE [{src}]: {px.shape[1]} candidates, {span}")
+
+    if args.overlay:
+        report_overlay(rec, cost_rt_bps=args.cost_bps)
 
 
 if __name__ == "__main__":

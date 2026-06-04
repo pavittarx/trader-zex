@@ -19,9 +19,12 @@ instrument built (2026-06).
 > (t 3.2)** beyond beta, L/S net Sharpe **~0.5**, both sub-periods robust, 2×
 > cost-robust. Comparable-to-modestly-better than PEAD. Size gradient is genuine
 > (megacaps have no edge; broad-liquid does). Gates remaining: OOS, −40% crash
-> tail (needs risk overlay), pre-2020 delistings still absent. See
-> `MOMENTUM_THESIS.md` §10-§11. NOTE: the "momentum" killed in the OHLCV sweep
-> was *intraday/daily-rebalance* — monthly 12-1 cross-sectional is different.
+> tail, pre-2020 delistings still absent. Crash-risk overlays (vol-scaling +
+> market-trend filter) lift in-sample Sharpe 0.49→0.79 but do NOT cut the ~−40%
+> tail — it's a 2014-style up-market value rotation that bear filters miss
+> (§12). Remaining gate: OOS (2022-2026). See `MOMENTUM_THESIS.md` §10-§12.
+> NOTE: the "momentum" killed in the OHLCV sweep was *intraday/daily-rebalance* —
+> monthly 12-1 cross-sectional is different.
 
 Prior parked items below. Tools to reuse live in `scripts/`:
 `feature_ic.py`, `intraday_edge.py`, `gap_fade_test.py`, `gap_fade_intraday.py`,
