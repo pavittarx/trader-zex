@@ -88,8 +88,9 @@ def _gh_file_list():
     return sorted(set(re.findall(r"(\d{3}_[A-Z0-9&\-]+\.csv)", html)))
 
 
-def _gh_close(fname):
-    """Fetch one CSV (cached) -> Adj Close Series indexed by date."""
+def _gh_cols(fname):
+    """Fetch one CSV (cached) -> (adj_close, traded_value) Series, date-indexed.
+    traded_value = unadjusted Close x Volume = rupee turnover (liquidity proxy)."""
     os.makedirs(_CACHE, exist_ok=True)
     path = os.path.join(_CACHE, fname)
     if os.path.exists(path):
@@ -98,13 +99,16 @@ def _gh_close(fname):
         raw = _http_get(f"{GH_RAW}/{fname}")
         open(path, "wb").write(raw)
     df = pd.read_csv(io.StringIO(raw.decode("utf-8", "replace")), parse_dates=["Date"])
-    s = df.set_index("Date")["Adj Close"].astype(float)
-    s.index = s.index.normalize()
-    return s[s > 0]
+    df = df.set_index("Date")
+    df.index = df.index.normalize()
+    adj = df["Adj Close"].astype(float)
+    tv = df["Close"].astype(float) * df["Volume"].astype(float)
+    adj = adj[adj > 0]
+    return adj, tv.reindex(adj.index)
 
 
 def load_panel_github(universe="allsymbols", top_n=200):
-    """Wide Adj-Close panel from the public GitHub NIFTY500 dataset."""
+    """Wide (Adj-Close, traded-value) panels from the public GitHub NIFTY500 set."""
     files = _gh_file_list()
     sym2file = {f.split("_", 1)[1][:-4]: f for f in files}  # SYMBOL -> NNN_SYMBOL.csv
     if universe == "allsymbols":
@@ -118,15 +122,17 @@ def load_panel_github(universe="allsymbols", top_n=200):
         chosen = [(f.split("_", 1)[1][:-4], f) for f in files[:top_n]]
     else:  # "all"
         chosen = [(f.split("_", 1)[1][:-4], f) for f in files]
-    closes = {}
+    closes, tvs = {}, {}
     for sym, f in chosen:
         try:
-            s = _gh_close(f)
-            if len(s) > LOOKBACK + SKIP + 21:
-                closes[sym] = s
+            adj, tv = _gh_cols(f)
+            if len(adj) > LOOKBACK + SKIP + 21:
+                closes[sym], tvs[sym] = adj, tv
         except Exception:
             pass
-    return pd.DataFrame(closes).sort_index()
+    px = pd.DataFrame(closes).sort_index()
+    tv = pd.DataFrame(tvs).reindex(index=px.index, columns=px.columns)
+    return px, tv
 
 
 def load_panel(symbols, years):
@@ -154,10 +160,15 @@ def rebalance_positions(px: pd.DataFrame) -> list[int]:
     return sorted(idx.get_loc(d) for d in months.values)
 
 
-def build_records(px: pd.DataFrame) -> pd.DataFrame:
-    """One row per (rebalance, symbol): momentum signal + forward return."""
+def build_records(px: pd.DataFrame, tv: pd.DataFrame | None = None,
+                  liq_window: int = 63) -> pd.DataFrame:
+    """One row per (rebalance, symbol): momentum signal + forward return.
+    If tv (traded-value panel) is given, also attach `liq` = trailing-median
+    rupee turnover over the prior `liq_window` days — a POINT-IN-TIME liquidity
+    measure (uses only data up to the rebalance, no look-ahead)."""
     reb = rebalance_positions(px)
     vals = px.values
+    tvals = tv.reindex(index=px.index, columns=px.columns).values if tv is not None else None
     cols = px.columns
     idx = px.index
     rows = []
@@ -173,14 +184,32 @@ def build_records(px: pd.DataFrame) -> pd.DataFrame:
             p_fwd = vals[p_next, j]         # next rebalance close
             if not np.all(np.isfinite([p0, p_skip, p_now, p_fwd])) or p0 <= 0 or p_now <= 0:
                 continue
-            rows.append({
+            rec = {
                 "reb": k,
                 "date": idx[p],
                 "symbol": sym,
                 "mom": p_skip / p0 - 1.0,        # 12-1 momentum
                 "fwd": p_fwd / p_now - 1.0,      # next-month return
-            })
+            }
+            if tvals is not None:
+                window = tvals[max(0, p - liq_window + 1):p + 1, j]
+                rec["liq"] = float(np.nanmedian(window)) if np.isfinite(window).any() else np.nan
+            rows.append(rec)
     return pd.DataFrame(rows)
+
+
+def pit_filter(rec: pd.DataFrame, top_k: int) -> pd.DataFrame:
+    """Keep only the top_k symbols by point-in-time liquidity at EACH rebalance.
+    This makes the universe dynamic and survivorship-aware: a name that was not
+    yet liquid at rebalance r is excluded at r (its later growth no longer counts
+    as a position we would have held). Removes the 'grew-into-the-index' bias."""
+    if "liq" not in rec.columns:
+        raise ValueError("records have no `liq` column — PIT filter needs a tv panel")
+    keep = []
+    for k, g in rec.groupby("reb"):
+        g = g[np.isfinite(g["liq"])]
+        keep.append(g.nlargest(min(top_k, len(g)), "liq"))
+    return pd.concat(keep, ignore_index=True) if keep else rec.iloc[0:0]
 
 
 def pooled_ic(rec: pd.DataFrame) -> tuple[float, float, int]:
@@ -380,15 +409,23 @@ def main() -> None:
                    default="allsymbols", help="--github universe selector")
     p.add_argument("--top-n", type=int, default=200,
                    help="N names for --universe top (market-cap ranked)")
+    p.add_argument("--pit-top-k", type=int, default=0,
+                   help="point-in-time universe: keep top-K names by trailing "
+                        "liquidity at EACH rebalance (kills 'grew-into-index' "
+                        "survivorship bias). 0 = off. Needs a traded-value panel "
+                        "(--github).")
+    p.add_argument("--pit-liq-window", type=int, default=63,
+                   help="trailing days for the PIT liquidity median (default ~3mo)")
     args = p.parse_args()
 
     if args.self_test:
         self_test()
         return
 
+    tv = None
     if args.github:
         print(f"Data source: GitHub {GH_REPO} (split-adjusted Adj Close, 2012-2021).")
-        px = load_panel_github(args.universe, args.top_n)
+        px, tv = load_panel_github(args.universe, args.top_n)
         src = f"GitHub NIFTY500 [{args.universe}{'/'+str(args.top_n) if args.universe=='top' else ''}]"
     else:
         if args.all_symbols:
@@ -405,9 +442,20 @@ def main() -> None:
         print(f"Only {px.shape[1]} symbols loaded — need >=5 for cross-sectional IC.")
         return
     span = f"{px.index.min().date()}..{px.index.max().date()}"
-    rec = build_records(px)
+    rec = build_records(px, tv, liq_window=args.pit_liq_window)
+
+    if args.pit_top_k:
+        if "liq" not in rec.columns:
+            p.error("--pit-top-k needs a traded-value panel (use --github)")
+        rec = pit_filter(rec, args.pit_top_k)
+        per_reb = rec.groupby("reb")["symbol"].nunique()
+        src += f" PIT-top{args.pit_top_k}(liq{args.pit_liq_window}d)"
+        print(f"Point-in-time universe: top-{args.pit_top_k} by trailing-{args.pit_liq_window}d "
+              f"liquidity each month (avg {per_reb.mean():.0f} names/rebalance, "
+              f"{rec['symbol'].nunique()} distinct names ever used).")
+
     report(rec, cost_rt_bps=args.cost_bps,
-           label=f"LIVE [{src}]: {px.shape[1]} symbols, {span}")
+           label=f"LIVE [{src}]: {px.shape[1]} candidates, {span}")
 
 
 if __name__ == "__main__":

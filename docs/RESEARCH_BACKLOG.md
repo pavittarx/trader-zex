@@ -11,16 +11,17 @@ instrument built (2026-06).
 > **UPDATE (2026-06): first live candidate found — PEAD.** Earnings-reaction
 > drift survived scaling (44→186 events, t≈2.5) where price/volume leads did
 > not. Low-turnover, cost math works. See `PEAD_THESIS.md`. Needs OOS.
-> **UPDATE (2026-06): cross-sectional momentum — IN-SAMPLE EDGE CONFIRMED,
-> strongest candidate yet.** Monthly 12-1 momentum on real split-adjusted NSE
-> data (2012-2021): full-universe IC t **3.3**, long-only alpha t **4.2** beyond
-> beta 0.9, L/S net Sharpe **~0.8**, cost-robust at 2×, both sub-periods positive.
-> Strengthens monotonically with universe breadth (large-cap-only is too
-> efficient: t 1.56, no alpha) — same dispersion gradient as PEAD. BEATS PEAD
-> (~0.5). BUT survivorship-inflated (2020 NIFTY500 snapshot) + in-sample only.
-> See `MOMENTUM_THESIS.md` §10. Gates: point-in-time universe, then OOS.
-> NOTE: the "momentum" killed in the OHLCV sweep was *intraday/daily-rebalance* —
-> classic monthly 12-1 cross-sectional momentum is a different timescale.
+> **UPDATE (2026-06): cross-sectional momentum — REAL BUT MODEST edge,
+> survivorship-corrected.** Monthly 12-1 momentum on real split-adjusted NSE data
+> (2012-2021). Static full universe looked strong (IC t 3.3, Sharpe 0.8) but was
+> ~40% SURVIVORSHIP-INFLATED. With a point-in-time top-200-by-liquidity universe
+> (rebuilt each month, no look-ahead): IC t **2.0**, long-only alpha **~0.9%/mo
+> (t 3.2)** beyond beta, L/S net Sharpe **~0.5**, both sub-periods robust, 2×
+> cost-robust. Comparable-to-modestly-better than PEAD. Size gradient is genuine
+> (megacaps have no edge; broad-liquid does). Gates remaining: OOS, −40% crash
+> tail (needs risk overlay), pre-2020 delistings still absent. See
+> `MOMENTUM_THESIS.md` §10-§11. NOTE: the "momentum" killed in the OHLCV sweep
+> was *intraday/daily-rebalance* — monthly 12-1 cross-sectional is different.
 
 Prior parked items below. Tools to reuse live in `scripts/`:
 `feature_ic.py`, `intraday_edge.py`, `gap_fade_test.py`, `gap_fade_intraday.py`,

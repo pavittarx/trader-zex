@@ -1,15 +1,16 @@
 # Strategy Thesis — Cross-Sectional Momentum (Trend-Following), NSE
 
-Status: **IN-SAMPLE EDGE CONFIRMED ON REAL DATA — STRONGEST CANDIDATE SO FAR,
-BUT SURVIVORSHIP-INFLATED AND NOT OOS-VALIDATED (2026-06).** Cross-sectional
-12-1 momentum shows a real, significant, cost-robust, beta-adjusted edge on a
-broad NSE universe (full-universe IC t 3.3, long-only alpha t 4.2, L/S net
-Sharpe ~0.8 in-sample 2012-2021) — clearly stronger than PEAD (~0.5). The edge
-strengthens monotonically with universe breadth, exactly as the thesis predicted
-(§10). **Caveats that gate it:** the test universe is survivorship-biased (NIFTY500
-membership as of ~2020), which inflates the magnitude; it is in-sample only (one
-window, no OOS); and it carries a -28%+ momentum-crash tail. See §10. Documented
-per `STRATEGY_GUIDELINES.md` §9.
+Status: **REAL BUT MODEST IN-SAMPLE EDGE, SURVIVORSHIP-CORRECTED (2026-06).**
+Cross-sectional 12-1 momentum is a genuine, significant, cost-robust,
+beta-adjusted edge on a broad liquid NSE universe. After correcting for
+survivorship with a point-in-time liquidity universe (§11), the honest estimate
+is **L/S net Sharpe ~0.5 / long-only alpha ~0.9%/mo (t 3.2, ~11%/yr) beyond beta**
+on a top-200-by-liquidity universe (2012-2021), robust across both sub-periods and
+2× cost — vs. the survivorship-INFLATED static-universe Sharpe of 0.81 (§10). That
+makes it comparable-to-modestly-better than PEAD (~0.5). **Still gating it:** (a)
+in-sample only — no OOS yet; (b) a −40% momentum-crash tail needing a risk overlay;
+(c) the candidate pool still omits pre-2020 delistings (residual upward bias).
+See §10-§11. Documented per `STRATEGY_GUIDELINES.md` §9.
 
 ---
 
@@ -129,7 +130,7 @@ daily-rebalance signals where cost was ~28%/yr.
 |-------|--------|
 | 1. Logic check | **DONE** — edge stated, falsifiable, code matches description |
 | 2. Cost survival | **PASS** — low turnover (~21%/mo); net survives 2× cost (§10) |
-| 3. In-sample statistical validity | **PASS (broad universe), with caveats** — IC t 3.3, alpha t 4.2, both sub-periods positive; BUT survivorship-inflated (§10) |
+| 3. In-sample statistical validity | **PASS, survivorship-corrected** — PIT top-200: IC t 2.0, alpha t 3.2, both sub-periods positive, 2× cost-robust (§11). Magnitude ~half the inflated static figure |
 | 4. Out-of-sample | **not started — THE gate** (single 2012-2021 window so far) |
 | 5. Walk-forward | not started |
 | 6. Benchmark vs Nifty | **PASS (broad)** — long-only alpha +1.07%/mo beyond beta 0.92 |
@@ -237,11 +238,55 @@ broad universe, the same liquidity/efficiency gradient PEAD showed.
    independently audited. A live-pipeline rerun is needed before trusting specifics.
 
 ### Next steps (priority order)
-1. **Point-in-time universe** — kill the survivorship inflation; re-measure the
-   honest magnitude. The single most important correction.
+1. ~~Point-in-time universe~~ — **DONE, see §11.**
 2. **Out-of-sample window** (2022-2026 via live Fyers) with the rule frozen — Stage 4.
 3. **Risk overlay** — TS-momentum flat-switch and/or vol-scaling to cut the crash
    tail; measure the Sharpe improvement.
 4. Only then a production NautilusTrader portfolio backtest.
+
+---
+
+## 11. Survivorship correction — point-in-time liquidity universe (2026-06)
+
+The §10 static universe is NIFTY500 membership as of ~2020, so names that *grew
+into* the index are present for their whole 2012 history — momentum winners baked
+in. The fix: at **each** monthly rebalance, select the universe dynamically as the
+top-K names by **trailing-63-day rupee turnover** (median of Close×Volume up to
+that rebalance — point-in-time, no look-ahead). A name that wasn't liquid yet at
+rebalance *r* is excluded at *r*, so its later run-up no longer counts as a
+position we'd have held. Implemented as `momentum_ic.py --pit-top-k K`:
+
+```bash
+uv run python scripts/momentum_ic.py --github --universe all --pit-top-k 200
+```
+
+| Universe | distinct names used | IC t | L/S net Sharpe (1×) | long-only α t | maxDD | sub-periods (H1/H2 Sharpe) |
+|----------|------|------|------|------|------|------|
+| Static full 483 (**survivorship-inflated**) | 483 | 3.31 | **0.81** | 4.22 | −28% | +0.97 / +0.63 |
+| PIT top-50 (megacaps only)   | 129 | 1.28 | 0.03 | 0.59 ✗ | −62% | +0.16 / −0.10 ✗ |
+| PIT top-100                  | 202 | 1.76 | 0.24 | 2.03 | −47% | +0.28 / +0.20 |
+| **PIT top-200 (honest, tradable)** | 376 | **2.02** | **0.49** | **3.18** | −40% | +0.47 / +0.51 ✓ |
+
+**What the correction reveals:**
+1. **The 0.81 Sharpe was ~40% survivorship inflation.** The honest, point-in-time
+   number is **L/S net Sharpe ~0.5, long-only alpha ~0.9%/mo (t 3.2, ~11%/yr)
+   beyond beta 0.92**, robust across both sub-periods, surviving 2× cost. Real and
+   significant — but roughly half the headline, and now comparable-to-modestly-
+   better than PEAD (~0.5), not a windfall.
+2. **The size/dispersion gradient is genuine, not a survivorship artifact** — it
+   persists *within* the point-in-time universe: top-50 megacaps have NO edge
+   (alpha t 0.59, H2 negative — too efficient), while the broader top-200 liquid
+   names do (alpha t 3.18). This is the same efficiency gradient PEAD showed,
+   measured cleanly. The tradeable sweet spot is the *broad-but-liquid* ~200-name
+   set, not the megacaps and not the untradeable small-cap tail.
+3. **The crash tail survives the correction** — maxDD −40% at top-200. A risk
+   overlay (next step) is not optional for live trading.
+
+**Residual caveat that remains un-fixable with this dataset:** the candidate pool
+is still only names that survived to the 2020 snapshot — stocks delisted/failed
+before 2020 are absent entirely, which no PIT filter can recover. So even the
+top-200 Sharpe ~0.5 is a mild *upper* bound. The honest read: **a real, modest,
+tradable momentum edge (Sharpe ~0.4-0.5, long-only alpha ~10%/yr) in a broad
+liquid NSE universe — pending out-of-sample confirmation and a crash-risk overlay.**
 </content>
 </invoke>
