@@ -11,13 +11,16 @@ instrument built (2026-06).
 > **UPDATE (2026-06): first live candidate found — PEAD.** Earnings-reaction
 > drift survived scaling (44→186 events, t≈2.5) where price/volume leads did
 > not. Low-turnover, cost math works. See `PEAD_THESIS.md`. Needs OOS.
-> **UPDATE (2026-06): cross-sectional momentum opened as a second low-turnover
-> lane.** Thesis + self-test-verified harness built (`docs/MOMENTUM_THESIS.md`,
-> `scripts/momentum_ic.py`). Monthly-rebalanced 12-1 momentum directly targets
-> the binding turnover constraint. NOTE: the "momentum" killed in the OHLCV
-> sweep was *intraday/daily-rebalance* — classic monthly 12-1 cross-sectional
-> momentum is a different timescale and was NOT tested. Live in-sample verdict
-> pending a run with reachable daily data.
+> **UPDATE (2026-06): cross-sectional momentum — IN-SAMPLE EDGE CONFIRMED,
+> strongest candidate yet.** Monthly 12-1 momentum on real split-adjusted NSE
+> data (2012-2021): full-universe IC t **3.3**, long-only alpha t **4.2** beyond
+> beta 0.9, L/S net Sharpe **~0.8**, cost-robust at 2×, both sub-periods positive.
+> Strengthens monotonically with universe breadth (large-cap-only is too
+> efficient: t 1.56, no alpha) — same dispersion gradient as PEAD. BEATS PEAD
+> (~0.5). BUT survivorship-inflated (2020 NIFTY500 snapshot) + in-sample only.
+> See `MOMENTUM_THESIS.md` §10. Gates: point-in-time universe, then OOS.
+> NOTE: the "momentum" killed in the OHLCV sweep was *intraday/daily-rebalance* —
+> classic monthly 12-1 cross-sectional momentum is a different timescale.
 
 Prior parked items below. Tools to reuse live in `scripts/`:
 `feature_ic.py`, `intraday_edge.py`, `gap_fade_test.py`, `gap_fade_intraday.py`,

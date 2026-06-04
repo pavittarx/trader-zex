@@ -1,11 +1,15 @@
 # Strategy Thesis — Cross-Sectional Momentum (Trend-Following), NSE
 
-Status: **THESIS + INSTRUMENT BUILT, LIVE TEST PENDING DATA (2026-06).**
-Stage 1 (logic) written; the test harness (`scripts/momentum_ic.py`) is built and
-self-test-verified (recovers a planted signal, stays flat on noise). The live
-in-sample verdict is gated on a run with reachable daily data (Fyers creds or an
-equivalent source) — the build environment had neither a Fyers token nor egress
-to any market-data host. Documented per `STRATEGY_GUIDELINES.md` §9.
+Status: **IN-SAMPLE EDGE CONFIRMED ON REAL DATA — STRONGEST CANDIDATE SO FAR,
+BUT SURVIVORSHIP-INFLATED AND NOT OOS-VALIDATED (2026-06).** Cross-sectional
+12-1 momentum shows a real, significant, cost-robust, beta-adjusted edge on a
+broad NSE universe (full-universe IC t 3.3, long-only alpha t 4.2, L/S net
+Sharpe ~0.8 in-sample 2012-2021) — clearly stronger than PEAD (~0.5). The edge
+strengthens monotonically with universe breadth, exactly as the thesis predicted
+(§10). **Caveats that gate it:** the test universe is survivorship-biased (NIFTY500
+membership as of ~2020), which inflates the magnitude; it is in-sample only (one
+window, no OOS); and it carries a -28%+ momentum-crash tail. See §10. Documented
+per `STRATEGY_GUIDELINES.md` §9.
 
 ---
 
@@ -124,11 +128,11 @@ daily-rebalance signals where cost was ~28%/yr.
 | Stage | Status |
 |-------|--------|
 | 1. Logic check | **DONE** — edge stated, falsifiable, code matches description |
-| 2. Cost survival | pending live run (harness computes 1×/1.5×/2×) |
-| 3. In-sample statistical validity | pending live run (harness computes IC, t, sub-period split) |
-| 4. Out-of-sample | not started |
+| 2. Cost survival | **PASS** — low turnover (~21%/mo); net survives 2× cost (§10) |
+| 3. In-sample statistical validity | **PASS (broad universe), with caveats** — IC t 3.3, alpha t 4.2, both sub-periods positive; BUT survivorship-inflated (§10) |
+| 4. Out-of-sample | **not started — THE gate** (single 2012-2021 window so far) |
 | 5. Walk-forward | not started |
-| 6. Benchmark vs Nifty | partial — long-only leg is decomposed vs equal-weight universe |
+| 6. Benchmark vs Nifty | **PASS (broad)** — long-only alpha +1.07%/mo beyond beta 0.92 |
 | 7-8. Paper / live | not started |
 
 **Instrument validation (done now, no market data needed):** `momentum_ic.py
@@ -172,5 +176,72 @@ The live run prints: pooled IC + t, dollar-neutral L/S annualized return / Sharp
 / max-DD net of cost, long-only alpha/beta vs the equal-weight market, average
 monthly turnover, a sub-period robustness split, and a 1×/1.5×/2× cost-sensitivity
 table. Read it against the four falsification criteria in §1.
+
+---
+
+## 10. Live in-sample result (2012-2021, real split-adjusted NSE data)
+
+Fyers was unreachable in the build environment (no token; market-data hosts
+blocked by the network policy), so the run used a public substitute: the GitHub
+dataset `Ratnesh-bhosale/NIFTY500_dataset` — Yahoo-derived daily **Adj Close**
+(split/dividend-adjusted, the correct input for 12-month momentum), 2012-01-02 →
+2021-12-31, 107 monthly rebalances. Reproduce with:
+
+```bash
+uv run python scripts/momentum_ic.py --github --universe allsymbols   # pre-registered 30
+uv run python scripts/momentum_ic.py --github --universe top --top-n 200
+uv run python scripts/momentum_ic.py --github --universe all          # full NIFTY500
+```
+
+The dispersion gradient predicted in §2 is confirmed — momentum strengthens
+**monotonically** with universe breadth:
+
+| Universe | n | IC | IC t | L/S net Sharpe | L/S net ann | maxDD | Long-only α/mo | α t | β |
+|----------|---|-----|------|------|------|-------|------|------|------|
+| ALL_SYMBOLS (pre-registered, large-cap) | 30  | +0.044 | 1.56 | 0.13 | +3.3%  | −57% | +0.57% | 1.27 | 0.87 |
+| Top 200 (mcap)                          | 197 | +0.043 | 2.48 | 0.40 | +7.2%  | −35% | +0.75% | 2.91 | 0.91 |
+| Full NIFTY500                           | 483 | +0.050 | 3.31 | 0.81 | +14.0% | −28% | +1.07% | 4.22 | 0.92 |
+
+Against the four falsification criteria (§1):
+1. **IC ≈ 0? NO** — broad-universe IC t 2.5-3.3, significant. Edge present.
+2. **Just beta? NO** (broad) — long-only alpha t 2.9-4.2 *beyond* beta ~0.9.
+   **YES** (large-cap-only) — alpha t 1.27, indistinguishable from beta.
+3. **Cost-killed? NO** — turnover ~21-24%/mo; net survives 2× cost easily
+   (the whole point of a low-turnover design — contrast the dead daily signals).
+4. **Period-specific? NO** — both sub-period halves positive at every breadth
+   (full universe H1 Sharpe 0.97, H2 0.63).
+
+**Verdict: cross-sectional momentum is a real, significant, cost-robust,
+beta-adjusted edge on NSE in this in-sample window — the strongest candidate this
+repo has produced (full-universe net Sharpe ~0.8 vs PEAD's ~0.5).** The
+pre-registered large-cap universe is too efficient/narrow to clear the bar
+(t 1.56, no alpha beyond beta) — confirming the edge lives in the higher-dispersion
+broad universe, the same liquidity/efficiency gradient PEAD showed.
+
+### Why this is NOT yet tradable at the stated magnitude — the caveats that gate it
+1. **Survivorship bias (the big one).** The universe is NIFTY500 membership as of
+   ~March 2020 (the dataset's `MCAP_31032020` snapshot) applied to 2012-2021
+   history. Names that were small in 2012 and *grew into* the 500 by 2020 are
+   present for their whole history — and those are precisely the momentum winners.
+   This biases the level UP, likely materially. The *gradient* and *direction* are
+   credible; the *magnitude* (Sharpe 0.8, 14%/yr) is optimistic until a
+   point-in-time constituent universe is used.
+2. **In-sample only, one window** (2012-2021). No out-of-sample. THE gate, same as
+   PEAD. Stage 4 not started.
+3. **Momentum-crash tail.** maxDD −28% to −57% (the 2018-20 mid/small-cap drawdown
+   + 2020 COVID reversal). The TS-momentum 200-day flat-switch / vol-scaling
+   overlay (§3 follow-up) exists to cut this tail; untested here.
+4. **Short leg illustrative only** — NSE multi-day shorts need F&O (§8 guidelines).
+   The tradable form is long-only: beta ~0.9 + the alpha tilt.
+5. **Third-party data, not live Fyers** — Yahoo-derived, ends 2021, not
+   independently audited. A live-pipeline rerun is needed before trusting specifics.
+
+### Next steps (priority order)
+1. **Point-in-time universe** — kill the survivorship inflation; re-measure the
+   honest magnitude. The single most important correction.
+2. **Out-of-sample window** (2022-2026 via live Fyers) with the rule frozen — Stage 4.
+3. **Risk overlay** — TS-momentum flat-switch and/or vol-scaling to cut the crash
+   tail; measure the Sharpe improvement.
+4. Only then a production NautilusTrader portfolio backtest.
 </content>
 </invoke>

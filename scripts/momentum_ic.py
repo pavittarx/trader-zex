@@ -23,13 +23,18 @@ manufacture signal.
 from __future__ import annotations
 
 import argparse
+import io
 import logging
+import os
+import sys
+import urllib.request
 from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 logging.disable(logging.WARNING)
 
 LOOKBACK = 252   # ~12 months of trading days
@@ -57,6 +62,71 @@ def fetch_daily(client, sym, frm, to, chunk_days=360):
     allp = pd.concat(parts).sort_index()
     allp = allp[~allp.index.duplicated()]
     return allp["close"]
+
+
+# --------------------------------------------------------------------------- #
+# Alternative data source: public split-ADJUSTED NSE daily dataset on GitHub.
+# Real NIFTY500 daily Adj Close, 2012-2021 (Yahoo-derived). Used when Fyers
+# creds / a live data host are unreachable. Provenance is documented in the
+# run output; results carry the dataset's window + survivorship caveats.
+# --------------------------------------------------------------------------- #
+GH_REPO = "Ratnesh-bhosale/NIFTY500_dataset"
+GH_RAW = f"https://raw.githubusercontent.com/{GH_REPO}/main/Dataset"
+GH_TREE = f"https://github.com/{GH_REPO}/tree/main/Dataset"
+_CACHE = "/tmp/nifty500_cache"
+
+
+def _http_get(url, timeout=30):
+    return urllib.request.urlopen(
+        urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=timeout
+    ).read()
+
+
+def _gh_file_list():
+    import re
+    html = _http_get(GH_TREE).decode("utf-8", "replace")
+    return sorted(set(re.findall(r"(\d{3}_[A-Z0-9&\-]+\.csv)", html)))
+
+
+def _gh_close(fname):
+    """Fetch one CSV (cached) -> Adj Close Series indexed by date."""
+    os.makedirs(_CACHE, exist_ok=True)
+    path = os.path.join(_CACHE, fname)
+    if os.path.exists(path):
+        raw = open(path, "rb").read()
+    else:
+        raw = _http_get(f"{GH_RAW}/{fname}")
+        open(path, "wb").write(raw)
+    df = pd.read_csv(io.StringIO(raw.decode("utf-8", "replace")), parse_dates=["Date"])
+    s = df.set_index("Date")["Adj Close"].astype(float)
+    s.index = s.index.normalize()
+    return s[s > 0]
+
+
+def load_panel_github(universe="allsymbols", top_n=200):
+    """Wide Adj-Close panel from the public GitHub NIFTY500 dataset."""
+    files = _gh_file_list()
+    sym2file = {f.split("_", 1)[1][:-4]: f for f in files}  # SYMBOL -> NNN_SYMBOL.csv
+    if universe == "allsymbols":
+        import config
+        plains = [s.replace("NSE:", "").replace("-EQ", "") for s in config.ALL_SYMBOLS]
+        chosen = [(p, sym2file[p]) for p in plains if p in sym2file]
+        missing = [p for p in plains if p not in sym2file]
+        if missing:
+            print(f"  (not in dataset, skipped: {', '.join(missing)})")
+    elif universe == "top":
+        chosen = [(f.split("_", 1)[1][:-4], f) for f in files[:top_n]]
+    else:  # "all"
+        chosen = [(f.split("_", 1)[1][:-4], f) for f in files]
+    closes = {}
+    for sym, f in chosen:
+        try:
+            s = _gh_close(f)
+            if len(s) > LOOKBACK + SKIP + 21:
+                closes[sym] = s
+        except Exception:
+            pass
+    return pd.DataFrame(closes).sort_index()
 
 
 def load_panel(symbols, years):
@@ -303,28 +373,41 @@ def main() -> None:
     p.add_argument("--cost-bps", type=float, default=COST_RT_BPS)
     p.add_argument("--self-test", action="store_true",
                    help="run synthetic-data instrument validation (no market data)")
+    p.add_argument("--github", action="store_true",
+                   help="use the public split-adjusted GitHub NIFTY500 dataset "
+                        "(2012-2021) instead of Fyers")
+    p.add_argument("--universe", choices=["allsymbols", "top", "all"],
+                   default="allsymbols", help="--github universe selector")
+    p.add_argument("--top-n", type=int, default=200,
+                   help="N names for --universe top (market-cap ranked)")
     args = p.parse_args()
 
     if args.self_test:
         self_test()
         return
 
-    if args.all_symbols:
-        import config
-        symbols = config.ALL_SYMBOLS
-    elif args.symbols:
-        symbols = args.symbols
+    if args.github:
+        print(f"Data source: GitHub {GH_REPO} (split-adjusted Adj Close, 2012-2021).")
+        px = load_panel_github(args.universe, args.top_n)
+        src = f"GitHub NIFTY500 [{args.universe}{'/'+str(args.top_n) if args.universe=='top' else ''}]"
     else:
-        p.error("pass --symbols, --all-symbols, or --self-test")
+        if args.all_symbols:
+            import config
+            symbols = config.ALL_SYMBOLS
+        elif args.symbols:
+            symbols = args.symbols
+        else:
+            p.error("pass --symbols, --all-symbols, --github, or --self-test")
+        px = load_panel(symbols, args.years)
+        src = f"Fyers, {args.years:g}y"
 
-    px = load_panel(symbols, args.years)
     if px.shape[1] < 5:
-        print(f"Only {px.shape[1]} symbols loaded — need >=5 for cross-sectional IC. "
-              "(Fyers creds / reachable daily data required.)")
+        print(f"Only {px.shape[1]} symbols loaded — need >=5 for cross-sectional IC.")
         return
+    span = f"{px.index.min().date()}..{px.index.max().date()}"
     rec = build_records(px)
     report(rec, cost_rt_bps=args.cost_bps,
-           label=f"LIVE: {px.shape[1]} symbols, {args.years:g}y")
+           label=f"LIVE [{src}]: {px.shape[1]} symbols, {span}")
 
 
 if __name__ == "__main__":
