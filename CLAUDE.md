@@ -4,70 +4,62 @@ Guidance for working in this repository.
 
 ## What this project is
 
-**Trader Zex** is an Indian-equity (NSE) regime screener, daily stock ranker, and
-event-driven backtesting system. The pipeline is:
+**Trader Zex** is a multi-strategy trading research pipeline for Indian
+equities (NSE, via Fyers) with a broker-agnostic core. Strategies move through
+a stage-gated lifecycle (see `docs/PIPELINE.md`):
 
 ```
-Fyers OHLCV  →  HMM regime  ┐
-                            ├─ confluence signal ─┐
-structure (S/R levels) ─────┘                     ├─ ranker (daily top-N picks)
-                                                  └─ backtest strategy (15m + 60m)
+hypothesis → triage → vectorized → backtest → sandbox → live
+     └──────────┴─────────┴────────────┴──────────┴──→ dropped (any time)
 ```
 
-The core thesis: classify market regime with a Hidden Markov Model, locate price
-relative to support/resistance, combine the two into an actionable signal, then
-either rank the universe for live candidate selection or backtest the entry/exit
-rules.
+Each strategy is a self-contained folder under `strategies/<name>/` with a
+machine-readable `manifest.py` (stage, params, universe, kill criteria,
+broker) and a human `STATUS.md` (hypothesis, findings, stage history, kill
+log). Runners enforce the stage gates.
 
-## Module map
+## Layout
 
-| File | Responsibility |
+| Path | Responsibility |
 |------|---------------|
-| `core/hmm_model.py` | Gaussian HMM (hmmlearn) → Bullish / Sideways / Bearish regime from log-return + range-ratio features |
-| `core/structure.py` | Support/resistance via ATR Keltner bands (default) or scipy swing pivots |
-| `core/confluence.py` | 3×3 matrix mapping (regime × price-location) → signal (STRONG BUY … STRONG SELL) |
-| `core/fyers_client.py` | Fyers API v3 OHLCV history, auto token refresh, 1-min base resampling (`RESAMPLE_RULES`, `resample_ohlcv`) |
-| `core/universe.py` | Tradable universe (Nifty 500), daily-cached (`get_tradable_universe`) |
-| `core/screener.py` | Runs the regime+structure+confluence stack across symbols/timeframes |
-| `core/ranker.py` | Daily multi-factor stock ranking → top-N long/short candidates |
-| `core/main.py` | CLI screener entry point |
-| `rxconfig.py` / `trader_zex/` | Reflex web dashboard |
-| `core/auth.py` | Fyers OAuth token bootstrap |
-| `backtest/` | NautilusTrader backtesting engine (see below) |
+| `core/config.py` | Infra config only (creds, token path, rate limits, `HMM_*`, `STRUCTURE_*`, `BACKTEST_*` engine defaults, `UNIVERSE_*`) |
+| `core/manifest.py` | `Stage` / `Manifest` / `KillCriterion` — the lifecycle contract |
+| `core/brokers/` | `base.py` DataAdapter+ExecutionAdapter ABCs + registry; `fyers/` (client, TOTP auth, adapter). Strategies NEVER import a broker — the manifest names one, the runner injects it |
+| `core/signals/` | hmm_model (3-state Gaussian HMM regime), structure (S/R via ATR Keltner/pivots), confluence (3×3 regime×location → signal) |
+| `core/research/` | Vectorized harness: `data` (chunked fetch + parquet cache), `cost`, `stats` (sharpe/t/IC/DD), `event_study` (reaction/drift/IC — strategy-agnostic), `events_nse` (earnings dates), `report` |
+| `core/backtest/` | NautilusTrader glue: data_loader (IST→UTC), instruments, signal_precompute (no look-ahead, disk-cached), engine, metrics |
+| `core/live/` | `risk.py` (KillSwitch criteria registry), `state.py` (persisted halt state `~/.trader_zex/state/`), `monitor.py` (offline kill-check CLI) |
+| `apps/` | Operator tools consuming core: screener, ranker, universe, main (screener CLI). NOT importable by strategies |
+| `strategies/<name>/` | manifest.py, STATUS.md, core.py (signal/risk logic), strategy.py (the ONE NT Strategy: backtest = live), backtest.py (runner entry), research/, tests/ |
+| `runners/` | `list`, `backtest`, `sandbox`, `live` — stage-gated entry points |
+| `scripts/` | Generic research CLIs only (feature_ic, intraday_edge, ranker_ic, screener_data) |
+| `trader_zex/` + `rxconfig.py` | Reflex web dashboard |
 
-## The ranker (`core/ranker.py`)
+Current strategies: **pead** (stage: sandbox — see its STATUS.md milestones),
+**hmm_confluence** (backtest; promotion blocked per OHLCV-sweep verdict),
+gap_fade / reversal / breakout / continuation (dropped — post-mortems in their
+STATUS.md). New strategy: copy `strategies/_template/`.
 
-`StockRanker.rank(force=False)` returns `RankResult(long, short, scores_df)`.
-Composite score (weights in `core/config.py`):
+## Commands
 
-- **40%** signal strength — confluence signal on 15-min bars
-- **30%** structure proximity — closeness to support (long) / resistance (short)
-- **20%** momentum — 5-day return, direction-adjusted
-- **10%** volume surge — recent vs. 20-day average, capped
+This project uses **`uv`** and **poe** tasks (see `pyproject.toml`).
 
-Direction is set by the **60-min regime** (Bullish→LONG, Bearish→SHORT,
-Sideways→LONG with lower score). Results cache to `~/.trader_zex_rankings.json`,
-keyed by calendar date; same-day reruns hit the cache unless `force=True`.
+```bash
+uv run python -m runners.list                  # all strategies + stages + halt status
+uv run python -m runners.backtest pead         # stage >= backtest enforced
+uv run python -m runners.backtest hmm_confluence --all-symbols
+uv run python -m runners.sandbox pead          # stage >= sandbox + not halted
+uv run python -m runners.live pead --i-am-sure # stage == live EXACTLY
+uv run python -m core.live.monitor pead [--csv trades.csv | --reset-halt]
 
-## The backtest (`backtest/`)
+uv run poe screen        # screener (apps/main.py)
+uv run poe rank          # daily ranked stocks (apps/ranker.py)
+uv run poe backtest      # legacy HMM portfolio backtest CLI (core/backtest)
+uv run poe app           # reflex web dashboard
+uv run poe auth          # Fyers OAuth/TOTP bootstrap
 
-| File | Responsibility |
-|------|---------------|
-| `data_loader.py` | Fyers DataFrame → NautilusTrader `Bar` objects; **IST→UTC** conversion |
-| `signal_precompute.py` | Rolling per-bar HMM+confluence signals, **no look-ahead**; disk-cached |
-| `instruments.py` | NSE `Equity` instrument definitions (with commission fees) |
-| `strategy.py` | `HMMConfluenceStrategy` — 15-min entry/exit filtered by 60-min regime |
-| `engine.py` | `run_backtest` (single) and `run_backtest_portfolio` (shared capital) |
-| `metrics.py` | Win rate, P&L, drawdown, profit factor from the positions report |
-| `__main__.py` | CLI: `python -m backtest` |
-
-### Strategy rules (`HMMConfluenceStrategy`)
-
-- **Long entry**: 60-min regime Bullish AND 15-min signal ∈ {STRONG BUY, WEAK BUY}
-  AND regime stable (last N signals agree) AND no position.
-- **Short entry**: same with Bearish / {STRONG SELL, AVOID}, gated on `allow_shorts`.
-- **Exits**: take-profit signal / regime flip / stop-loss / EOD flatten (15:15 IST).
-- **Sizing**: fixed-fractional — risk `BACKTEST_RISK_PCT` of equity per trade.
+uv run pytest            # fast suite; -m slow for HMM-fit tests
+```
 
 ## Critical conventions (don't regress these)
 
@@ -84,39 +76,32 @@ keyed by calendar date; same-day reruns hit the cache unless `force=True`.
 4. **Survivorship bias guard**: `--use-ranker` deliberately prints rankings and
    **exits** — it must NOT select symbols for a historical backtest (today's
    rankings choosing historical winners = look-ahead). Use `--all-symbols` for
-   fair backtesting. A faithful ranker backtest needs point-in-time (walk-forward)
-   ranking, which is not yet built.
+   fair backtesting. A faithful ranker backtest needs point-in-time ranking.
 5. **Position state** in the strategy is derived from
    `portfolio.is_net_long/is_net_short`, never a manual `_position_side` field
    (that desyncs on order rejection). `on_order_rejected` / `on_position_closed`
    reset manual `_stop_price` / `_trade_count`.
 6. **Signal cache key** includes a config hash so HMM/structure param changes
-   invalidate stale cached signals.
-
-## Commands
-
-This project uses **`uv`** and **poe** tasks (see `pyproject.toml`).
-
-```bash
-uv run poe screen        # run the screener (core/main.py)
-uv run poe rank          # print today's ranked stocks
-uv run poe backtest      # run the backtester
-uv run poe app           # reflex web dashboard
-uv run poe auth          # Fyers OAuth bootstrap
-
-# Backtest CLI
-uv run python -m backtest                      # DEFAULT_SYMBOLS
-uv run python -m backtest --all-symbols        # full fixed universe (fair)
-uv run python -m backtest --symbols NSE:RELIANCE-EQ NSE:TCS-EQ
-uv run python -m backtest --use-ranker         # print rankings, then EXIT
-uv run python -m backtest --allow-shorts       # enable short side
-uv run python -m backtest --date-from 2024-01-01 --date-to 2024-06-30
-```
+   invalidate stale cached signals. The research harness's parquet cache keys
+   include the adapter's venue.
+7. **Manifests are the single source of strategy params.** PEAD's params/
+   universe/kill-criteria live ONLY in `strategies/pead/manifest.py` — never
+   re-add them to `core/config.py`. Kill criteria are pre-registered: locked
+   before sandbox, evaluated mechanically (`core.live.risk`), no overrides.
+8. **One NT Strategy class per strategy** — the class that backtests is the
+   class that trades. No parallel cron reimplementation (removed once; drifts).
+9. **Stage gates are enforced, not advisory.** `stage` lives in the manifest;
+   changing it is a promotion/demotion decision recorded in STATUS.md.
+10. **Brokers are injected.** Strategy code must not import `core.brokers.fyers`
+    directly; declare `broker=` in the manifest and let runners inject the
+    `DataAdapter` (`runners._common.broker_for`).
 
 ## Environment notes
 
 - Requires Fyers API credentials in `.env` and a token at `~/.fyers_token.json`
-  (created by `core/auth.py`). Without them, live data fetches won't run.
+  (created by `core/brokers/fyers/auth.py`; headless TOTP refresh available via
+  `FYERS_FY_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET`).
 - Python deps are **not** on the bare interpreter — always run via `uv run`.
-- Config lives in `core/config.py`: `RANKER_*`, `BACKTEST_*`, `HMM_*`, `STRUCTURE_*`,
-  `ALL_SYMBOLS`, `DEFAULT_SYMBOLS`.
+- The sandbox/live TradingNode (Fyers NT data/exec clients) is **not built
+  yet** — see milestones in `strategies/pead/STATUS.md`. Sandbox runs need EC2
+  in market hours; offline kill-switch machinery is in `core/live/`.
