@@ -12,7 +12,7 @@ nautilus_trader = pytest.importorskip("nautilus_trader")
 from decimal import Decimal
 
 from backtest.instruments import fyers_to_instrument_id, make_equity
-import config
+from core import config
 
 
 class TestFyersToInstrumentId:

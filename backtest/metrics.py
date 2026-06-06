@@ -25,7 +25,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-import config
+from core import config
 from backtest.engine import BacktestResult
 
 log = logging.getLogger(__name__)

@@ -27,7 +27,7 @@ from nautilus_trader.model.enums import AccountType, OmsType
 from nautilus_trader.model.identifiers import Venue
 from nautilus_trader.model.objects import Money
 
-import config
+from core import config
 from backtest.data_loader import df_to_bars, make_bar_type
 from backtest.instruments import make_equity, fyers_to_instrument_id
 from backtest.signal_precompute import compute_rolling_signals, make_cache_key

@@ -15,8 +15,8 @@ from datetime import date, timedelta
 import pandas as pd
 from fyers_apiv3 import fyersModel
 
-import auth
-import config
+from core import auth
+from core import config
 
 log = logging.getLogger(__name__)
 

@@ -14,11 +14,11 @@ from datetime import datetime
 
 import reflex as rx
 
-import auth as fyers_auth
-import config as app_config
-from fyers_client import FyersClient
-from screener import Screener
-from universe import get_cached_symbols
+from core import auth as fyers_auth
+from core import config as app_config
+from core.fyers_client import FyersClient
+from core.screener import Screener
+from core.universe import get_cached_symbols
 import pandas as pd
 from trader_zex.table_html import _REGIME_CLASS, _SIGNAL_CLASS, _LOCATION_CLASS, fmt_age
 

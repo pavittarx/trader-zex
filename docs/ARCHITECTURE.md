@@ -5,12 +5,12 @@
 ```mermaid
 flowchart TD
     subgraph AUTH["Auth & Universe"]
-        A[auth.py<br/>Fyers OAuth] -->|token| TOK[(~/.fyers_token.json)]
-        U[universe.py<br/>Nifty 500 bulk fetch] -->|daily cache| UCACHE[(~/.trader_zex_universe.json)]
+        A[core/auth.py<br/>Fyers OAuth] -->|token| TOK[(~/.fyers_token.json)]
+        U[core/universe.py<br/>Nifty 500 bulk fetch] -->|daily cache| UCACHE[(~/.trader_zex_universe.json)]
     end
 
     subgraph DATA["Data layer"]
-        FC[fyers_client.py<br/>get_history / get_history_multi]
+        FC[core/fyers_client.py<br/>get_history / get_history_multi]
         TOK --> FC
         FC -->|1-min OHLCV| RS[resample_ohlcv<br/>RESAMPLE_RULES]
         RS --> TF5[5-min]
@@ -20,9 +20,9 @@ flowchart TD
     end
 
     subgraph SIGNAL["Signal stack (per symbol × timeframe)"]
-        HMM[hmm_model.py<br/>3-state Gaussian HMM<br/>features: log-ret + range-ratio]
-        STR[structure.py<br/>ATR Keltner bands / pivots<br/>support / resistance / location]
-        CONF[confluence.py<br/>3×3 regime × location → signal]
+        HMM[core/hmm_model.py<br/>3-state Gaussian HMM<br/>features: log-ret + range-ratio]
+        STR[core/structure.py<br/>ATR Keltner bands / pivots<br/>support / resistance / location]
+        CONF[core/confluence.py<br/>3×3 regime × location → signal]
         HMM -->|regime| CONF
         STR -->|location| CONF
     end
@@ -31,13 +31,13 @@ flowchart TD
     TF15 --> STR
     TF60 --> HMM
 
-    CONF --> SCR[screener.py<br/>orchestrate across symbols/TFs]
+    CONF --> SCR[core/screener.py<br/>orchestrate across symbols/TFs]
     U --> SCR
 
     subgraph OUTPUTS["Consumers"]
-        SCR --> MAIN[main.py CLI<br/>regime + signal table]
-        SCR --> DASH[dashboard.py<br/>Reflex web UI]
-        SCR --> RANK[ranker.py<br/>multi-factor composite]
+        SCR --> MAIN[core/main.py CLI<br/>regime + signal table]
+        SCR --> DASH[trader_zex/<br/>Reflex web UI]
+        SCR --> RANK[core/ranker.py<br/>multi-factor composite]
     end
 ```
 

@@ -23,22 +23,22 @@ rules.
 
 | File | Responsibility |
 |------|---------------|
-| `hmm_model.py` | Gaussian HMM (hmmlearn) → Bullish / Sideways / Bearish regime from log-return + range-ratio features |
-| `structure.py` | Support/resistance via ATR Keltner bands (default) or scipy swing pivots |
-| `confluence.py` | 3×3 matrix mapping (regime × price-location) → signal (STRONG BUY … STRONG SELL) |
-| `fyers_client.py` | Fyers API v3 OHLCV history, auto token refresh, 1-min base resampling (`RESAMPLE_RULES`, `resample_ohlcv`) |
-| `universe.py` | Tradable universe (Nifty 500), daily-cached (`get_tradable_universe`) |
-| `screener.py` | Runs the regime+structure+confluence stack across symbols/timeframes |
-| `ranker.py` | Daily multi-factor stock ranking → top-N long/short candidates |
-| `main.py` | CLI screener entry point |
-| `dashboard.py` / `rxconfig.py` | Reflex web dashboard |
-| `auth.py` | Fyers OAuth token bootstrap |
+| `core/hmm_model.py` | Gaussian HMM (hmmlearn) → Bullish / Sideways / Bearish regime from log-return + range-ratio features |
+| `core/structure.py` | Support/resistance via ATR Keltner bands (default) or scipy swing pivots |
+| `core/confluence.py` | 3×3 matrix mapping (regime × price-location) → signal (STRONG BUY … STRONG SELL) |
+| `core/fyers_client.py` | Fyers API v3 OHLCV history, auto token refresh, 1-min base resampling (`RESAMPLE_RULES`, `resample_ohlcv`) |
+| `core/universe.py` | Tradable universe (Nifty 500), daily-cached (`get_tradable_universe`) |
+| `core/screener.py` | Runs the regime+structure+confluence stack across symbols/timeframes |
+| `core/ranker.py` | Daily multi-factor stock ranking → top-N long/short candidates |
+| `core/main.py` | CLI screener entry point |
+| `rxconfig.py` / `trader_zex/` | Reflex web dashboard |
+| `core/auth.py` | Fyers OAuth token bootstrap |
 | `backtest/` | NautilusTrader backtesting engine (see below) |
 
-## The ranker (`ranker.py`)
+## The ranker (`core/ranker.py`)
 
 `StockRanker.rank(force=False)` returns `RankResult(long, short, scores_df)`.
-Composite score (weights in `config.py`):
+Composite score (weights in `core/config.py`):
 
 - **40%** signal strength — confluence signal on 15-min bars
 - **30%** structure proximity — closeness to support (long) / resistance (short)
@@ -98,10 +98,10 @@ keyed by calendar date; same-day reruns hit the cache unless `force=True`.
 This project uses **`uv`** and **poe** tasks (see `pyproject.toml`).
 
 ```bash
-uv run poe screen        # run the screener (main.py)
+uv run poe screen        # run the screener (core/main.py)
 uv run poe rank          # print today's ranked stocks
 uv run poe backtest      # run the backtester
-uv run poe dashboard     # reflex web dashboard
+uv run poe app           # reflex web dashboard
 uv run poe auth          # Fyers OAuth bootstrap
 
 # Backtest CLI
@@ -116,7 +116,7 @@ uv run python -m backtest --date-from 2024-01-01 --date-to 2024-06-30
 ## Environment notes
 
 - Requires Fyers API credentials in `.env` and a token at `~/.fyers_token.json`
-  (created by `auth.py`). Without them, live data fetches won't run.
+  (created by `core/auth.py`). Without them, live data fetches won't run.
 - Python deps are **not** on the bare interpreter — always run via `uv run`.
-- Config lives in `config.py`: `RANKER_*`, `BACKTEST_*`, `HMM_*`, `STRUCTURE_*`,
+- Config lives in `core/config.py`: `RANKER_*`, `BACKTEST_*`, `HMM_*`, `STRUCTURE_*`,
   `ALL_SYMBOLS`, `DEFAULT_SYMBOLS`.

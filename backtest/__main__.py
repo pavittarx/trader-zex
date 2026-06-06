@@ -38,10 +38,10 @@ import logging
 import sys
 from datetime import date, timedelta
 
-import config
+from core import config
 from backtest.engine import run_backtest_portfolio, BacktestResult
 from backtest.metrics import print_summary
-from fyers_client import FyersClient
+from core.fyers_client import FyersClient
 
 logging.basicConfig(
     level=logging.INFO,
