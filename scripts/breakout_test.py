@@ -23,26 +23,9 @@ import pandas as pd
 
 from core import config  # noqa
 from core.fyers_client import FyersClient
+from core.research.data import fetch_intraday
 import logging
 logging.disable(logging.WARNING)
-
-
-def fetch_intraday(client, sym, frm, to, resolution="15", chunk_days=95):
-    parts, cur = [], frm
-    while cur <= to:
-        end = min(cur + timedelta(days=chunk_days - 1), to)
-        try:
-            df = client.get_history(sym, resolution, date_from=cur, date_to=end)
-            if not df.empty:
-                parts.append(df)
-        except Exception:
-            pass
-        cur = end + timedelta(days=1)
-        time.sleep(config.API_SLEEP_SECONDS)
-    if not parts:
-        return pd.DataFrame()
-    allp = pd.concat(parts).sort_index()
-    return allp[~allp.index.duplicated()]
 
 
 def trades_for_symbol(intr: pd.DataFrame, nr: int, rt: float) -> list[float]:

@@ -17,6 +17,7 @@ dependencies = [
     "reflex>=0.9.0",
     "nautilus-trader>=1.208.0",
     "pyarrow>=14.0.0",
+    "pyotp>=2.9.0",
 ]
 
 [dependency-groups]

@@ -24,67 +24,11 @@ from scipy import stats
 
 from core import config  # noqa
 from core.fyers_client import FyersClient
+from core.research.data import fetch_daily            # noqa: F401 (re-export)
+from core.research.events_nse import result_dates     # noqa: F401 (re-export)
+from core.research.event_study import events_with_drift as events_for
 import logging
 logging.disable(logging.WARNING)
-
-
-def fetch_daily(client, sym, frm, to, chunk_days=360):
-    """Daily history in <=chunk_days windows (Fyers caps 1D at 366 days/request)."""
-    parts, cur = [], frm
-    while cur <= to:
-        end = min(cur + timedelta(days=chunk_days - 1), to)
-        try:
-            df = client.get_history(sym, "D", date_from=cur, date_to=end)
-            if not df.empty:
-                parts.append(df)
-        except Exception:
-            pass
-        cur = end + timedelta(days=1)
-    if not parts:
-        return pd.DataFrame()
-    allp = pd.concat(parts).sort_index()
-    return allp[~allp.index.duplicated()]
-
-
-def result_dates(sym_plain: str) -> list[pd.Timestamp]:
-    import nsepython as n
-    try:
-        raw = n.nse_past_results(sym_plain)
-    except Exception:
-        return []
-    rows = (raw.get("resCmpData") or []) if isinstance(raw, dict) else []
-    out = []
-    for r in rows:
-        dt = r.get("re_create_dt")
-        if dt:
-            try:
-                out.append(pd.to_datetime(dt, format="%d-%b-%Y"))
-            except Exception:
-                pass
-    return sorted(set(out))
-
-
-def events_for(close: pd.Series, dates: list[pd.Timestamp], horizons: list[int]):
-    """Return list of dicts: reaction + drift over each horizon, no look-ahead."""
-    idx = close.index
-    out = []
-    for d in dates:
-        # Results are announced after-hours on re_create_dt; the market reacts
-        # the NEXT session. So the reaction day is the first trading day STRICTLY
-        # after the announcement (verified via scripts/_align_check.py).
-        t = idx.searchsorted(d, side="right")
-        if t < 1 or t >= len(idx):
-            continue
-        reaction = close.iloc[t] / close.iloc[t - 1] - 1   # move into the reaction day
-        rec = {"reaction": float(reaction), "date": idx[t]}
-        ok = True
-        for h in horizons:
-            if t + h >= len(close):
-                ok = False; break
-            rec[f"drift_{h}"] = float(close.iloc[t + h] / close.iloc[t] - 1)
-        if ok:
-            out.append(rec)
-    return out
 
 
 def main() -> None:

@@ -37,7 +37,9 @@ def build_trades(client, symbols, frm, to, thresh, hold):
         df = fetch_daily(client, s, frm, to)
         if df.empty or len(df) < 40:
             continue
-        close = df.sort_index()["close"]; close.index = close.index.normalize()
+        df = df.sort_index()
+        close = df["close"]; close.index = close.index.normalize()
+        liq = float((df["close"] * df["volume"]).median())   # median daily traded value
         panel[s] = close
         idx = close.index
         for d in dates:
@@ -50,7 +52,7 @@ def build_trades(client, symbols, frm, to, thresh, hold):
             if abs(reaction) < thresh:
                 continue
             trades.append({"sym": s, "entry": t, "exit": t + hold,
-                           "side": 1 if reaction > 0 else -1})
+                           "side": 1 if reaction > 0 else -1, "liq": liq})
     return trades, panel
 
 
@@ -73,18 +75,7 @@ def run(trades, panel, target_n, rt_bps):
     return daily
 
 
-def metrics(daily: pd.Series) -> dict:
-    d = daily[daily.index >= daily[daily != 0].index.min()] if (daily != 0).any() else daily
-    if len(d) < 20:
-        return {}
-    eq = (1 + d).cumprod()
-    yrs = len(d) / 252
-    cagr = eq.iloc[-1] ** (1 / yrs) - 1 if eq.iloc[-1] > 0 else -1
-    sharpe = (d.mean() / d.std()) * np.sqrt(252) if d.std() > 0 else 0.0
-    dd = (eq / eq.cummax() - 1).min()
-    active = (d != 0).mean()
-    return {"cagr": cagr * 100, "sharpe": sharpe, "maxdd": dd * 100,
-            "final": eq.iloc[-1], "active_days": active * 100, "days": len(d)}
+from core.research.stats import daily_metrics as metrics  # noqa: E402
 
 
 def main() -> None:
@@ -95,6 +86,8 @@ def main() -> None:
     p.add_argument("--holds", nargs="+", type=int, default=[1, 20])
     p.add_argument("--target-n", type=int, default=10, help="positions for full investment")
     p.add_argument("--rt-bps", type=float, default=20.0)
+    p.add_argument("--liq-bucket", choices=("all", "low", "mid", "high"), default="all",
+                   help="restrict to a liquidity tercile (by median daily traded value)")
     args = p.parse_args()
 
     client = FyersClient()
@@ -103,6 +96,10 @@ def main() -> None:
     print(f"\n{'hold':>5}{'trades':>8}{'CAGR%':>9}{'Sharpe':>8}{'maxDD%':>9}{'final_x':>9}{'active%':>9}")
     for h in args.holds:
         trades, panel = build_trades(client, args.symbols, frm, to, args.thresh, h)
+        if args.liq_bucket != "all" and trades:
+            from core.pead_core import tercile_bounds, in_bucket
+            bounds = tercile_bounds({t["liq"] for t in trades})
+            trades = [t for t in trades if in_bucket(t["liq"], bounds, args.liq_bucket)]
         if len(trades) < 20:
             print(f"{h:>5}  too few trades ({len(trades)})"); continue
         m = metrics(run(trades, panel, args.target_n, args.rt_bps))

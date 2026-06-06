@@ -25,28 +25,9 @@ import pandas as pd
 
 from core import config  # noqa
 from core.fyers_client import FyersClient
+from core.research.data import fetch_intraday
 import logging
 logging.disable(logging.WARNING)
-
-
-def fetch_intraday(client: FyersClient, sym: str, frm: date, to: date,
-                   resolution: str = "15", chunk_days: int = 95) -> pd.DataFrame:
-    """Fetch intraday bars in <=chunk_days windows (Fyers intraday request cap)."""
-    parts = []
-    cur = frm
-    while cur <= to:
-        end = min(cur + timedelta(days=chunk_days - 1), to)
-        try:
-            df = client.get_history(sym, resolution, date_from=cur, date_to=end)
-            if not df.empty:
-                parts.append(df)
-        except Exception:
-            pass
-        cur = end + timedelta(days=1)
-        time.sleep(config.API_SLEEP_SECONDS)
-    if not parts:
-        return pd.DataFrame()
-    return pd.concat(parts).sort_index()[~pd.concat(parts).sort_index().index.duplicated()]
 
 
 def day_prices(intraday: pd.DataFrame, entry_off: int, exit_off: int) -> pd.DataFrame:

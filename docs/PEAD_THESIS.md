@@ -1,12 +1,13 @@
 # Strategy Thesis — Post-Earnings-Announcement Drift (PEAD), NSE
 
-Status: **MARGINAL CANDIDATE (2026-06)** — real but universe-dependent. The
-per-event drift is genuine and survived scaling/sub-period tests, but the
-portfolio Sharpe halved (1.10 → 0.51) when the universe was broadened from 47 to
-90 names: PEAD concentrates in less-efficient mid/small-caps and is weak in
-liquid blue-chips (matches the literature). Tradable edge lives where liquidity
-is worst — a capacity/cost tradeoff. Not validated cross-regime. Documented per
-`STRATEGY_GUIDELINES.md` §9.
+Status: **PROMISING (within-sample), UNVALIDATED (2026-06).** The edge is real
+and triangulates across three cuts, sharpest in lower-liquidity-but-tradeable
+names at the 20-day horizon (see §9–§10): liquidity-segmented net +2.42%/trade
+(t+2.5) and a portfolio Sharpe ~1.3 (maxDD −4%) at 30 bps. BUT: ~41 trades in
+that niche, ONE ~2yr regime, and the niche was selected post-hoc on the same
+data — coherent characterization, NOT independent validation. The blue-chip
+broad universe is only marginal (Sharpe ~0.5). Cross-regime OOS is the gate and
+is data-blocked (free sources reach ~2023). Documented per `GUIDELINES` §9.
 
 ## 1. Edge hypothesis
 > Investors underreact to earnings news; a stock's earnings-day move continues
@@ -141,3 +142,42 @@ quarters/symbol vs nse's 5) to test a real YoY earnings surprise
 (paid: Trendlyne / EODHD / IBES), NOT more EPS history. Don't pursue further
 free-fundamental refinements. The validated price-reaction PEAD (§2–3b) — real
 but marginal, universe-dependent — remains the best form.
+
+## 9. Liquidity-segmented test (2026-06) — a tradable bucket emerges
+`scripts/pead_liquidity.py`, ~57 names, |reaction|≥2%, 109 events. Segment by
+median daily traded value; apply bucket-appropriate round-trip cost.
+
+| Bucket (med liq) | n | 1-day gross/net (t) | 20-day gross/net (t) |
+|------------------|---|---------------------|----------------------|
+| HIGH (₹697cr/day, 15bps) | 36 | +0.47/+0.32% (t+1.8) | +0.14/−0.01% (t+0.2) |
+| MID (₹237cr/day, 30bps)  | 34 | +0.07/−0.23% (t+0.2) | −0.26/−0.56% (t−0.2) |
+| LOW (₹169cr/day, 55bps)  | 39 | +0.63/+0.08% (t+1.7) | **+2.97/+2.42% (t+2.5)** |
+
+**Most encouraging tradability evidence so far.** The 20-day drift concentrates
+in the lower-liquidity bucket and **survives a conservative 55 bps cost** (net
++2.42%/trade, t+2.5). Crucially that bucket is ₹169 cr/day (~$20M) — NOT
+illiquid (SAIL, NMDC, PNB, Ashok Leyland); real cost is ~25–35 bps, so true net
+is likely higher. Blue-chips retain only a weak 1-day effect (+0.32%, t+1.8).
+
+**Sharpened spec:** 20-day hold, lower-liquidity-but-tradeable names
+(~₹100–250 cr/day), |reaction|≥2%.
+
+**Caveats:** n=39 winning bucket, one ~2yr regime, 6 cells tested (multiple-
+comparison → treat as ~p<0.1). Triangulates with the §3b 47-name (mid-cap-heavy)
+Sharpe-1.1 result, so not a fresh artifact. Next: confirm via portfolio backtest
+restricted to this segment + more low-liquidity events.
+
+## 10. Low-liquidity portfolio backtest (2026-06) — best result, but post-hoc
+`pead_backtest.py --liq-bucket low`, 20-day hold, |react|≥2%, 30 bps, 41 trades:
+
+| Hold | CAGR | Sharpe | maxDD | Active |
+|------|------|--------|-------|--------|
+| 1 day  | +0.7% | +0.53 | −0.9% | 6% |
+| 20 day | +6.7% | **+1.32** | −4.1% | 29% |
+
+Confirms the liquidity-segment finding assembles into a real book (Sharpe ~1.3).
+Triangulates with §3b (47-name Sharpe 1.1) and §9 (LOW bucket net +2.42%, t+2.5)
+— three cuts, same conclusion. **Caveats are decisive, though:** 41 trades (wide
+error bars), one regime, and the low-liq niche was chosen post-hoc from the same
+data (not independent). Low capacity (29% invested). Verdict: PROMISING, needs
+out-of-sample (data-blocked) or forward paper-trading before any capital.

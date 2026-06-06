@@ -80,7 +80,7 @@ class FyersClient:
         interactive login flow (checks cache first, prompts if needed).
         """
         if access_token is None:
-            access_token = auth.interactive_login()
+            access_token = auth.login()   # cached → headless (TOTP) → interactive
 
         self._fyers = fyersModel.FyersModel(
             client_id=config.FYERS_CLIENT_ID,

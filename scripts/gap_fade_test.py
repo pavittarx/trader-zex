@@ -15,20 +15,9 @@ import pandas as pd
 
 from core import config  # noqa
 from core.fyers_client import FyersClient
+from core.research.report import stats_line
 import logging
 logging.disable(logging.WARNING)
-
-
-def stats_line(daily: np.ndarray, rt_cost: float, label: str) -> None:
-    if len(daily) < 20:
-        print(f"  {label:<22} (too few days: {len(daily)})"); return
-    net = daily - rt_cost                      # one round trip per day
-    ann_g = ((1 + daily.mean()) ** 252 - 1) * 100
-    ann_n = ((1 + net.mean()) ** 252 - 1) * 100
-    t = daily.mean() / (daily.std() / np.sqrt(len(daily))) if daily.std() > 0 else 0.0
-    sharpe_n = (net.mean() / net.std()) * np.sqrt(252) if net.std() > 0 else 0.0
-    print(f"  {label:<22} gross={ann_g:+7.1f}%  net={ann_n:+7.1f}%  "
-          f"t={t:+5.2f}  net_Sharpe={sharpe_n:+5.2f}  days={len(daily)}")
 
 
 def main() -> None:
