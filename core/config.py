@@ -13,6 +13,12 @@ FYERS_REDIRECT_URI = os.getenv(
     "FYERS_REDIRECT_URI",
     "https://trade.fyers.in/api-login/redirect-uri/index.html",
 )
+# Headless (TOTP) login — enables unattended daily token refresh (no browser).
+# SENSITIVE: the TOTP secret bypasses 2FA; PIN + secret = full account access.
+# Keep in .env only (gitignored); prefer a secrets manager on a server.
+FYERS_FY_ID = os.getenv("FYERS_FY_ID", "")            # your Fyers login ID
+FYERS_PIN = os.getenv("FYERS_PIN", "")                # 4-digit trading PIN
+FYERS_TOTP_SECRET = os.getenv("FYERS_TOTP_SECRET", "")  # base32 2FA seed
 
 # --- Token Persistence ---
 TOKEN_FILE = Path("~/.fyers_token.json").expanduser()

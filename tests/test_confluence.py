@@ -8,7 +8,7 @@ Covers:
 """
 import pytest
 
-from core.confluence import generate_signal, _SIGNAL_TABLE
+from core.signals.confluence import generate_signal, _SIGNAL_TABLE
 
 
 # ---------------------------------------------------------------------------

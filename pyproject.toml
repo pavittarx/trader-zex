@@ -17,6 +17,7 @@ dependencies = [
     "reflex>=0.9.0",
     "nautilus-trader>=1.208.0",
     "pyarrow>=14.0.0",
+    "pyotp>=2.9.0",
 ]
 
 [dependency-groups]
@@ -27,14 +28,15 @@ dev = [
 
 [tool.pytest.ini_options]
 addopts = "-m 'not slow'"
+testpaths = ["tests", "strategies"]
 markers = [
     "slow: marks tests as slow (HMM fit); deselected by default — run with -m slow",
 ]
 
 [tool.poe.tasks]
-screen    = "python -m core.main"
-universe  = "python -m core.main --universe"
+screen    = "python -m apps.main"
+universe  = "python -m apps.main --universe"
 app       = "reflex run"
-auth      = "python -m core.auth"
-rank      = "python -m core.ranker"
-backtest  = "python -m backtest"
+auth      = "python -m core.brokers.fyers.auth"
+rank      = "python -m apps.ranker"
+backtest  = "python -m core.backtest"

@@ -17,7 +17,7 @@ import pandas as pd
 import pytest
 
 from core import config
-from core.hmm_model import HMMModel, HMMResult
+from core.signals.hmm_model import HMMModel, HMMResult
 
 EXPECTED_REGIMES = {"Bullish", "Sideways", "Bearish"}
 

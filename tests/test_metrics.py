@@ -11,7 +11,7 @@ Covers:
 import pandas as pd
 import pytest
 
-from backtest.metrics import _from_positions
+from core.backtest.metrics import _from_positions
 
 
 # ---------------------------------------------------------------------------
