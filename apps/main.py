@@ -12,8 +12,8 @@ import logging
 
 from core import config
 from core.brokers.fyers.client import FyersClient
-from core.screener import Screener
-from core.universe import get_tradable_universe
+from apps.screener import Screener
+from apps.universe import get_tradable_universe
 
 logging.basicConfig(
     level=logging.INFO,

@@ -17,8 +17,8 @@ import reflex as rx
 from core.brokers.fyers import auth as fyers_auth
 from core import config as app_config
 from core.brokers.fyers.client import FyersClient
-from core.screener import Screener
-from core.universe import get_cached_symbols
+from apps.screener import Screener
+from apps.universe import get_cached_symbols
 import pandas as pd
 from trader_zex.table_html import _REGIME_CLASS, _SIGNAL_CLASS, _LOCATION_CLASS, fmt_age
 

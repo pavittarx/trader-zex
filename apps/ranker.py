@@ -51,7 +51,7 @@ from core.brokers.fyers.client import FyersClient, RESAMPLE_RULES, resample_ohlc
 from core.signals.hmm_model import HMMModel
 from core.signals.structure import StructureDetector
 from core.signals.confluence import generate_signal
-from core.universe import get_tradable_universe
+from apps.universe import get_tradable_universe
 
 log = logging.getLogger(__name__)
 
