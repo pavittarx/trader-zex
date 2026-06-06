@@ -28,7 +28,7 @@ import pandas as pd
 # Allow running from repo root
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.hmm_model import HMMModel
+from core.signals.hmm_model import HMMModel
 from core import config
 
 

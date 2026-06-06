@@ -11,8 +11,8 @@ import pytest
 
 nautilus_trader = pytest.importorskip("nautilus_trader")
 
-from backtest.data_loader import _to_utc_ns, df_to_bars, make_bar_type
-from backtest.instruments import fyers_to_instrument_id
+from core.backtest.data_loader import _to_utc_ns, df_to_bars, make_bar_type
+from core.backtest.instruments import fyers_to_instrument_id
 
 
 # ---------------------------------------------------------------------------

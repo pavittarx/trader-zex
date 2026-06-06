@@ -39,9 +39,9 @@ from scipy import stats
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.confluence import generate_signal, _SIGNAL_TABLE
-from core.hmm_model import HMMModel
-from core.structure import StructureDetector
+from core.signals.confluence import generate_signal, _SIGNAL_TABLE
+from core.signals.hmm_model import HMMModel
+from core.signals.structure import StructureDetector
 from core import config
 
 

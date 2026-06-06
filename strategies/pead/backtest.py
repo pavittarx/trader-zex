@@ -14,10 +14,10 @@ from core import config  # noqa
 from core.research.data import fetch_daily
 from core.research.event_study import in_bucket, reaction_events, tercile_bounds
 from core.research.events_nse import result_dates
-from backtest.engine import build_engine, _get_positions_report
-from backtest.instruments import make_equity
-from backtest.data_loader import make_bar_type, df_to_bars
-from backtest.metrics import _from_positions
+from core.backtest.engine import build_engine, _get_positions_report
+from core.backtest.instruments import make_equity
+from core.backtest.data_loader import make_bar_type, df_to_bars
+from core.backtest.metrics import _from_positions
 
 from strategies.pead.manifest import MANIFEST
 from strategies.pead.strategy import PEADStrategy, PEADStrategyConfig

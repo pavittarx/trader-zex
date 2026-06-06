@@ -15,7 +15,7 @@ import pandas as pd
 from scipy import stats
 
 from core import config  # noqa
-from core.fyers_client import FyersClient
+from core.brokers.fyers.client import FyersClient
 import logging
 logging.disable(logging.WARNING)
 

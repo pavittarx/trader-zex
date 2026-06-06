@@ -38,7 +38,7 @@ from scipy import stats
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core import config
-from core.fyers_client import FyersClient
+from core.brokers.fyers.client import FyersClient
 from core.ranker import StockRanker
 
 logging.basicConfig(

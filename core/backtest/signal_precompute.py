@@ -29,9 +29,9 @@ from pathlib import Path
 import pandas as pd
 
 from core import config
-from core.confluence import generate_signal
-from core.hmm_model import HMMModel
-from core.structure import StructureDetector
+from core.signals.confluence import generate_signal
+from core.signals.hmm_model import HMMModel
+from core.signals.structure import StructureDetector
 
 log = logging.getLogger(__name__)
 

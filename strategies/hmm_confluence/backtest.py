@@ -8,6 +8,6 @@ from __future__ import annotations
 
 def main(argv: list[str] | None = None) -> None:
     import sys
-    from backtest.__main__ import main as backtest_main
+    from core.backtest.__main__ import main as backtest_main
     sys.argv = ["backtest"] + list(argv or [])
     backtest_main()

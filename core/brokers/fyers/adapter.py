@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from core.brokers.base import DataAdapter
-from core.fyers_client import FyersClient, resample_ohlcv
+from core.brokers.fyers.client import FyersClient, resample_ohlcv
 
 _IST = ZoneInfo("Asia/Kolkata")
 

@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 
 from core import config
-from backtest.engine import BacktestResult
+from core.backtest.engine import BacktestResult
 
 log = logging.getLogger(__name__)
 

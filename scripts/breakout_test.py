@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 
 from core import config  # noqa
-from core.fyers_client import FyersClient
+from core.brokers.fyers.client import FyersClient
 from core.research.data import fetch_intraday
 import logging
 logging.disable(logging.WARNING)

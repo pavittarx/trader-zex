@@ -20,16 +20,16 @@ from dataclasses import dataclass
 import pandas as pd
 
 from core import config
-from core.fyers_client import (
+from core.brokers.fyers.client import (
     EOD_RESOLUTIONS,
     INTRADAY_RESOLUTIONS,
     RESAMPLE_RULES,
     FyersClient,
     resample_ohlcv,
 )
-from core.hmm_model import HMMModel
-from core.confluence import generate_signal, format_signal
-from core.structure import StructureDetector, StructureResult
+from core.signals.hmm_model import HMMModel
+from core.signals.confluence import generate_signal, format_signal
+from core.signals.structure import StructureDetector, StructureResult
 
 log = logging.getLogger(__name__)
 

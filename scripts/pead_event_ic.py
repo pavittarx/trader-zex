@@ -23,7 +23,7 @@ import pandas as pd
 from scipy import stats
 
 from core import config  # noqa
-from core.fyers_client import FyersClient
+from core.brokers.fyers.client import FyersClient
 from core.research.data import fetch_daily            # noqa: F401 (re-export)
 from core.research.events_nse import result_dates     # noqa: F401 (re-export)
 from core.research.event_study import events_with_drift as events_for

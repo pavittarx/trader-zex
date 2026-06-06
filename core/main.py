@@ -11,7 +11,7 @@ import argparse
 import logging
 
 from core import config
-from core.fyers_client import FyersClient
+from core.brokers.fyers.client import FyersClient
 from core.screener import Screener
 from core.universe import get_tradable_universe
 

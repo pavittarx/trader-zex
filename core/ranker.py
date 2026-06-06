@@ -47,10 +47,10 @@ from datetime import date, timedelta
 import pandas as pd
 
 from core import config
-from core.fyers_client import FyersClient, RESAMPLE_RULES, resample_ohlcv
-from core.hmm_model import HMMModel
-from core.structure import StructureDetector
-from core.confluence import generate_signal
+from core.brokers.fyers.client import FyersClient, RESAMPLE_RULES, resample_ohlcv
+from core.signals.hmm_model import HMMModel
+from core.signals.structure import StructureDetector
+from core.signals.confluence import generate_signal
 from core.universe import get_tradable_universe
 
 log = logging.getLogger(__name__)

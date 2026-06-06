@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 from core import config  # noqa
-from core.fyers_client import FyersClient
+from core.brokers.fyers.client import FyersClient
 from scripts.pead_event_ic import fetch_daily, result_dates
 from core.pead_core import kill_check
 import logging

@@ -14,9 +14,9 @@ from datetime import datetime
 
 import reflex as rx
 
-from core import auth as fyers_auth
+from core.brokers.fyers import auth as fyers_auth
 from core import config as app_config
-from core.fyers_client import FyersClient
+from core.brokers.fyers.client import FyersClient
 from core.screener import Screener
 from core.universe import get_cached_symbols
 import pandas as pd

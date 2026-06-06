@@ -4,11 +4,11 @@ engine.py — BacktestEngine setup and backtest runners.
 Usage
 -----
     # Single-symbol (legacy):
-    from backtest.engine import run_backtest
+    from core.backtest.engine import run_backtest
     result = run_backtest(client, fyers_sym="NSE:RELIANCE-EQ", ...)
 
     # Multi-symbol portfolio (shared capital, no survivorship bias from capital):
-    from backtest.engine import run_backtest_portfolio
+    from core.backtest.engine import run_backtest_portfolio
     results = run_backtest_portfolio(client, fyers_syms=["NSE:RELIANCE-EQ", ...], ...)
 """
 
@@ -28,10 +28,10 @@ from nautilus_trader.model.identifiers import Venue
 from nautilus_trader.model.objects import Money
 
 from core import config
-from backtest.data_loader import df_to_bars, make_bar_type
-from backtest.instruments import make_equity, fyers_to_instrument_id
-from backtest.signal_precompute import compute_rolling_signals, make_cache_key
-from backtest.strategy import HMMConfluenceStrategy, HMMStrategyConfig
+from core.backtest.data_loader import df_to_bars, make_bar_type
+from core.backtest.instruments import make_equity, fyers_to_instrument_id
+from core.backtest.signal_precompute import compute_rolling_signals, make_cache_key
+from core.backtest.strategy import HMMConfluenceStrategy, HMMStrategyConfig
 
 log = logging.getLogger(__name__)
 

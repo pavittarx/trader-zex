@@ -1,7 +1,7 @@
 """Tests for headless (TOTP) auth — the parts testable without live Fyers creds.
 The network steps can't be unit-tested offline; we cover the safety guards.
 """
-from core import auth
+from core.brokers.fyers import auth
 
 
 def test_headless_login_requires_credentials(monkeypatch):
