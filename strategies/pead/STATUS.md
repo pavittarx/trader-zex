@@ -35,10 +35,16 @@ round-trip cost is amortized over a 20-day move rather than a daily rebalance.
 
 ## Milestones to live (docs/ENVIRONMENTS.md gates)
 
-1. **[next] Sandbox infra (7b):** Fyers NT `LiveMarketDataClient` (poll daily
+1. **[next] TOTP auth workflow:** the headless login *code* is done
+   (`core/brokers/fyers/auth.py`), but the workflow isn't: (a) enable external
+   TOTP on the Fyers account + capture the base32 secret into `.env`
+   (`FYERS_FY_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET`), (b) verify `poe auth`
+   mints a token with no prompt, (c) daily ~08:45 IST refresh cron with
+   failure alerting. Hard dependency for everything below.
+2. **Sandbox infra (7b):** Fyers NT `LiveMarketDataClient` (poll daily
    bars) + `SandboxExecutionClient` TradingNode. Untestable offline — build +
-   iterate on EC2 in market hours. Headless TOTP auth is DONE (core auth).
-2. **Sandbox gate:** 2–3 months / ≥ 15 events, no kill-criterion fired, metrics
+   iterate on EC2 in market hours.
+3. **Sandbox gate:** 2–3 months / ≥ 15 events, no kill-criterion fired, metrics
    consistent with the prior (net ~+1–2%/trade, win ~52–55%).
-3. **Live infra (7c):** real Fyers `ExecutionClient` + pre-trade risk checks +
+4. **Live infra (7c):** real Fyers `ExecutionClient` + pre-trade risk checks +
    reconciliation. Start at 10–20% size; scale after ≥ 3 months consistent.
