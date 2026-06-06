@@ -26,6 +26,7 @@ from nautilus_trader.model.objects import Quantity
 from nautilus_trader.trading.strategy import Strategy
 import pandas as pd
 
+from core import config
 from strategies.pead.manifest import MANIFEST
 
 _P = MANIFEST.params

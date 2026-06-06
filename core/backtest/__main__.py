@@ -125,7 +125,7 @@ def main() -> None:
 
     # --use-ranker: print rankings and EXIT (no backtest)
     if args.use_ranker:
-        from ranker import StockRanker
+        from apps.ranker import StockRanker
         log.info("Running ranker to select top-%d symbols …", args.top_n)
         ranker = StockRanker(client, n_top=args.top_n)
         result = ranker.rank()

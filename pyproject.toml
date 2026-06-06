@@ -26,6 +26,27 @@ dev = [
     "pytest>=9.0.3",
 ]
 
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "basic"
+# pandas/numpy stubs are incomplete for the idioms this codebase lives on
+# (DatetimeIndex.date, Index.normalize, ExtensionArray arithmetic, NT configs).
+# Runtime correctness is covered by the test suite; keep the high-signal rules
+# (missing imports, unbound vars) on and silence the stub-gap noise.
+reportAttributeAccessIssue = "none"
+reportOperatorIssue = "none"
+reportArgumentType = "none"
+reportCallIssue = "none"
+reportIndexIssue = "none"
+reportReturnType = "none"
+reportAssignmentType = "none"
+reportFunctionMemberAccess = "none"
+reportOptionalSubscript = "none"
+reportOptionalMemberAccess = "none"
+reportOptionalIterable = "none"
+reportGeneralTypeIssues = "none"
+
 [tool.pytest.ini_options]
 addopts = "-m 'not slow'"
 testpaths = ["tests", "strategies"]

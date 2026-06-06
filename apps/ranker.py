@@ -20,8 +20,8 @@ Logic
 
 Usage
 -----
-    from fyers_client import FyersClient
-    from ranker import StockRanker
+    from core.brokers.fyers.client import FyersClient
+    from apps.ranker import StockRanker
 
     client = FyersClient()
     ranker = StockRanker(client, n_top=25)
@@ -452,7 +452,7 @@ if __name__ == "__main__":
                         help="Number of candidates per side")
     args = parser.parse_args()
 
-    from fyers_client import FyersClient
+    from core.brokers.fyers.client import FyersClient
     client = FyersClient()
     ranker = StockRanker(client, n_top=args.top_n)
     result = ranker.rank(force=args.force)

@@ -30,20 +30,20 @@ EOD_RESOLUTIONS: frozenset[str] = frozenset({"D", "W", "M"})
 
 # Maps Fyers resolution string → pandas resample offset alias
 RESAMPLE_RULES: dict[str, str] = {
-    "1":   "1min",
-    "2":   "2min",
-    "3":   "3min",
-    "5":   "5min",
-    "10":  "10min",
-    "15":  "15min",
-    "20":  "20min",
-    "30":  "30min",
-    "60":  "1h",
+    "1": "1min",
+    "2": "2min",
+    "3": "3min",
+    "5": "5min",
+    "10": "10min",
+    "15": "15min",
+    "20": "20min",
+    "30": "30min",
+    "60": "1h",
     "120": "2h",
     "240": "4h",
-    "D":   "D",
-    "W":   "W-FRI",   # week ending Friday (NSE)
-    "M":   "MS",      # month start
+    "D": "D",
+    "W": "W-FRI",  # week ending Friday (NSE)
+    "M": "MS",  # month start
 }
 
 
@@ -59,15 +59,12 @@ def resample_ohlcv(df: pd.DataFrame, rule: str) -> pd.DataFrame:
 
     Empty periods (outside market hours, weekends) are dropped.
     """
-    resampled = (
-        df.resample(rule, closed="left", label="left")
-        .agg(
-            open=("open", "first"),
-            high=("high", "max"),
-            low=("low", "min"),
-            close=("close", "last"),
-            volume=("volume", "sum"),
-        )
+    resampled = df.resample(rule, closed="left", label="left").agg(
+        open=("open", "first"),
+        high=("high", "max"),
+        low=("low", "min"),
+        close=("close", "last"),
+        volume=("volume", "sum"),
     )
     # Drop bars with no trades (non-trading periods have NaN close and zero volume)
     return resampled.dropna(subset=["close"]).loc[resampled["volume"] > 0]
@@ -80,12 +77,12 @@ class FyersClient:
         interactive login flow (checks cache first, prompts if needed).
         """
         if access_token is None:
-            access_token = auth.login()   # cached → headless (TOTP) → interactive
+            access_token = auth.login()  # cached → headless (TOTP) → interactive
 
         self._fyers = fyersModel.FyersModel(
             client_id=config.FYERS_CLIENT_ID,
             token=access_token,
-            log_path="",        # suppress verbose SDK file-logging
+            log_path="",  # suppress verbose SDK file-logging
         )
 
     # ------------------------------------------------------------------
@@ -127,7 +124,7 @@ class FyersClient:
         payload = {
             "symbol": symbol,
             "resolution": resolution,
-            "date_format": "1",                          # epoch timestamps
+            "date_format": "1",  # epoch timestamps
             "range_from": date_from.strftime("%Y-%m-%d"),
             "range_to": date_to.strftime("%Y-%m-%d"),
             "cont_flag": str(cont_flag),
@@ -148,11 +145,7 @@ class FyersClient:
 
         df = pd.DataFrame(candles, columns=_OHLCV_COLS)
         df = self._parse_timestamps(df, resolution)
-        df = (
-            df.drop_duplicates(subset=["datetime"])
-            .set_index("datetime")
-            .sort_index()
-        )
+        df = df.drop_duplicates(subset=["datetime"]).set_index("datetime").sort_index()
         return df
 
     def get_quotes(self, symbols: list[str]) -> pd.DataFrame:

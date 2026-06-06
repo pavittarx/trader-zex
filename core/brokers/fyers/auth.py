@@ -159,7 +159,7 @@ def headless_login() -> str:
         raise RuntimeError(f"send_login_otp failed: {r1}")
 
     # 2) verify TOTP (retry once in case we straddled the 30s code boundary)
-    rk2 = None
+    rk2, r2 = None, {}
     for _ in range(2):
         r2 = s.post(f"{_VAGATOR}/verify_otp",
                     json={"request_key": rk, "otp": pyotp.TOTP(secret).now()}, timeout=20).json()
