@@ -23,8 +23,8 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
-import config  # noqa
-from fyers_client import FyersClient
+from core import config  # noqa
+from core.fyers_client import FyersClient
 import logging
 logging.disable(logging.WARNING)
 

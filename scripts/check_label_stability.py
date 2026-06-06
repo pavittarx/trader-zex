@@ -28,8 +28,8 @@ import pandas as pd
 # Allow running from repo root
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from hmm_model import HMMModel
-import config
+from core.hmm_model import HMMModel
+from core import config
 
 
 def make_synthetic_data(n: int = 600) -> pd.DataFrame:

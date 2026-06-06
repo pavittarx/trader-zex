@@ -12,7 +12,7 @@ from nautilus_trader.model.identifiers import InstrumentId, Symbol, Venue
 from nautilus_trader.model.instruments import Equity
 from nautilus_trader.model.objects import Price, Quantity
 
-import config
+from core import config
 
 NSE_VENUE = Venue("NSE")
 

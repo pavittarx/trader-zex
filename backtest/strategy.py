@@ -47,7 +47,7 @@ from nautilus_trader.model.identifiers import InstrumentId, Venue
 from nautilus_trader.model.objects import Quantity
 from nautilus_trader.trading.strategy import Strategy
 
-import config
+from core import config
 
 log = logging.getLogger(__name__)
 _IST = ZoneInfo("Asia/Kolkata")

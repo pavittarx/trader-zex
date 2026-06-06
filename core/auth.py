@@ -15,7 +15,7 @@ from pathlib import Path
 
 from fyers_apiv3 import fyersModel
 
-import config
+from core import config
 
 log = logging.getLogger(__name__)
 
@@ -116,3 +116,7 @@ def interactive_login() -> str:
     token = generate_token(auth_code)
     print("Authentication successful.\n")
     return token
+
+
+if __name__ == "__main__":
+    interactive_login()

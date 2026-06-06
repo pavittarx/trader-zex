@@ -16,8 +16,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import config
-from hmm_model import HMMModel, HMMResult
+from core import config
+from core.hmm_model import HMMModel, HMMResult
 
 EXPECTED_REGIMES = {"Bullish", "Sideways", "Bearish"}
 

@@ -12,7 +12,7 @@ import json
 import logging
 from datetime import date
 
-import config
+from core import config
 
 log = logging.getLogger(__name__)
 

@@ -10,10 +10,10 @@ Usage
 import argparse
 import logging
 
-import config
-from fyers_client import FyersClient
-from screener import Screener
-from universe import get_tradable_universe
+from core import config
+from core.fyers_client import FyersClient
+from core.screener import Screener
+from core.universe import get_tradable_universe
 
 logging.basicConfig(
     level=logging.INFO,

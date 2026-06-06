@@ -26,7 +26,7 @@ import pandas as pd
 from hmmlearn.hmm import GaussianHMM
 from sklearn.preprocessing import StandardScaler
 
-import config
+from core import config
 
 log = logging.getLogger(__name__)
 

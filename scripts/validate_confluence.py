@@ -39,10 +39,10 @@ from scipy import stats
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from confluence import generate_signal, _SIGNAL_TABLE
-from hmm_model import HMMModel
-from structure import StructureDetector
-import config
+from core.confluence import generate_signal, _SIGNAL_TABLE
+from core.hmm_model import HMMModel
+from core.structure import StructureDetector
+from core import config
 
 
 # Expected direction for each signal (for validation)
