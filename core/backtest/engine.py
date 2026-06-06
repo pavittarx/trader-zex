@@ -31,7 +31,7 @@ from core import config
 from core.backtest.data_loader import df_to_bars, make_bar_type
 from core.backtest.instruments import make_equity, fyers_to_instrument_id
 from core.backtest.signal_precompute import compute_rolling_signals, make_cache_key
-from core.backtest.strategy import HMMConfluenceStrategy, HMMStrategyConfig
+from strategies.hmm_confluence.strategy import HMMConfluenceStrategy, HMMStrategyConfig
 
 log = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ previously untested across the (now-removed) duplicated implementations.
 import numpy as np
 import pandas as pd
 
-from core.pead_core import reaction_events, kill_check, tercile_bounds, in_bucket
+from strategies.pead.core import reaction_events, kill_check, tercile_bounds, in_bucket
 
 
 # --- reaction_events: the t+1 alignment that was a real bug ---------------

@@ -20,7 +20,7 @@ from scipy import stats
 
 from core import config  # noqa
 from core.brokers.fyers.client import FyersClient
-from scripts.pead_event_ic import fetch_daily
+from strategies.pead.research.pead_event_ic import fetch_daily
 import logging
 logging.disable(logging.WARNING)
 

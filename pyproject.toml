@@ -28,6 +28,7 @@ dev = [
 
 [tool.pytest.ini_options]
 addopts = "-m 'not slow'"
+testpaths = ["tests", "strategies"]
 markers = [
     "slow: marks tests as slow (HMM fit); deselected by default — run with -m slow",
 ]

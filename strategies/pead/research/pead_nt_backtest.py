@@ -12,12 +12,12 @@ import pandas as pd
 
 from core import config  # noqa
 from core.brokers.fyers.client import FyersClient
-from scripts.pead_event_ic import fetch_daily, result_dates
-from core.pead_core import reaction_events, tercile_bounds, in_bucket
+from strategies.pead.research.pead_event_ic import fetch_daily, result_dates
+from strategies.pead.core import reaction_events, tercile_bounds, in_bucket
 from core.backtest.engine import build_engine, _get_positions_report
 from core.backtest.instruments import make_equity, fyers_to_instrument_id
 from core.backtest.data_loader import make_bar_type, df_to_bars
-from core.backtest.pead_strategy import PEADStrategy, PEADStrategyConfig
+from strategies.pead.strategy import PEADStrategy, PEADStrategyConfig
 from core.backtest.metrics import _from_positions
 import logging
 logging.disable(logging.WARNING)

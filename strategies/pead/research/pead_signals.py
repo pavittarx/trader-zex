@@ -22,12 +22,14 @@ import pandas as pd
 
 from core import config  # noqa
 from core.brokers.fyers.client import FyersClient
-from scripts.pead_event_ic import fetch_daily, result_dates
-from core.pead_core import kill_check
+from strategies.pead.research.pead_event_ic import fetch_daily, result_dates
+from strategies.pead.core import kill_check
+from strategies.pead.manifest import MANIFEST
 import logging
 logging.disable(logging.WARNING)
 
-HOLD, THRESH = config.PEAD_HOLD_BARS, config.PEAD_THRESH
+HOLD, THRESH = MANIFEST.params["hold_bars"], MANIFEST.params["thresh"]
+_TRAILING = {k.kind: k.params for k in MANIFEST.kill_criteria}["trailing_mean"]["window"]
 
 
 def signals(client, symbols, as_of: date):
@@ -69,9 +71,9 @@ def monitor(path: str):
     df = pd.read_csv(path)
     r = df["net_ret"].astype(float).values
     eq = np.cumprod(1 + r); dd = (eq / np.maximum.accumulate(eq) - 1).min()
-    tr = r[-config.PEAD_KILL_TRAILING:]
+    tr = r[-_TRAILING:]
     print(f"trades={len(r)}  cum_return={ (eq[-1]-1)*100:+.1f}%  maxDD={dd*100:+.1f}%")
-    print(f"trailing-{config.PEAD_KILL_TRAILING}: mean={tr.mean()*100:+.2f}%  win%={ (tr>0).mean()*100:.0f}")
+    print(f"trailing-{_TRAILING}: mean={tr.mean()*100:+.2f}%  win%={ (tr>0).mean()*100:.0f}")
     reason = kill_check(r)   # canonical kill-criteria (pead_core)
     print("KILL-SWITCH:", f"{reason} → HALT" if reason else "OK — no criterion tripped")
 

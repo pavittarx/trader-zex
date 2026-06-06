@@ -22,7 +22,7 @@ import pandas as pd
 
 from core import config  # noqa
 from core.brokers.fyers.client import FyersClient
-from scripts.pead_event_ic import fetch_daily, result_dates
+from strategies.pead.research.pead_event_ic import fetch_daily, result_dates
 import logging
 logging.disable(logging.WARNING)
 

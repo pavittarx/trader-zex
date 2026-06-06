@@ -183,23 +183,3 @@ BACKTEST_TRAIL_PCT: float = 0.01                # trailing-stop distance once in
 BACKTEST_MAX_POSITION_PCT: float = 0.10         # max 10% of equity in one position
 BACKTEST_MAX_PARTICIPATION: float = 0.05        # max 5% of bar volume
 BACKTEST_MAX_GROSS_EXPOSURE: float = 0.80       # max 80% of equity deployed at once
-
-# --- PEAD strategy (post-earnings drift) — single source of truth ---
-# Spec from docs/PEAD_THESIS.md / PEAD_PLAYBOOK.md. Read by backtest/pead_strategy.py,
-# core/pead_core.py, and the PEAD scripts so all paths share identical params.
-PEAD_HOLD_BARS: int = 20            # sessions to hold after the reaction
-PEAD_THRESH: float = 0.02          # min reaction-day |return| to act
-PEAD_STOP_PCT: float = 0.12        # disaster stop (wide — preserve the drift)
-PEAD_CORP_GAP: float = 0.25        # overnight gap above this = probable corporate action
-PEAD_ALLOC_PCT: float = 0.30       # equity fraction per position (~3 concurrent)
-PEAD_MAX_GROSS: float = 0.90       # portfolio gross-exposure cap
-PEAD_LEG_BPS: float = 15.0         # cost per leg (entry, exit), bps
-PEAD_KILL_DD: float = 0.08         # kill-switch: halt on -8% equity drawdown
-PEAD_KILL_TRAILING: int = 20       # kill-switch trailing-trade window
-PEAD_PRIOR_PER_TRADE: float = 0.01 # expected net per-trade return (the prior to beat)
-# Locked lower-liquidity universe (the segment where the edge concentrated, §9-10).
-PEAD_UNIVERSE: list[str] = [
-    "NSE:SAIL-EQ", "NSE:NMDC-EQ", "NSE:PNB-EQ", "NSE:CANBK-EQ", "NSE:ASHOKLEY-EQ",
-    "NSE:BANKBARODA-EQ", "NSE:HINDPETRO-EQ", "NSE:GAIL-EQ", "NSE:NATIONALUM-EQ",
-    "NSE:MOTHERSON-EQ", "NSE:LICHSGFIN-EQ", "NSE:FEDERALBNK-EQ",
-]

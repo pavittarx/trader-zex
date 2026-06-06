@@ -21,7 +21,7 @@ import pandas as pd
 
 from core import config  # noqa
 from core.brokers.fyers.client import FyersClient
-from scripts.pead_event_ic import fetch_daily, result_dates
+from strategies.pead.research.pead_event_ic import fetch_daily, result_dates
 import logging
 logging.disable(logging.WARNING)
 
@@ -97,7 +97,7 @@ def main() -> None:
     for h in args.holds:
         trades, panel = build_trades(client, args.symbols, frm, to, args.thresh, h)
         if args.liq_bucket != "all" and trades:
-            from core.pead_core import tercile_bounds, in_bucket
+            from strategies.pead.core import tercile_bounds, in_bucket
             bounds = tercile_bounds({t["liq"] for t in trades})
             trades = [t for t in trades if in_bucket(t["liq"], bounds, args.liq_bucket)]
         if len(trades) < 20:
