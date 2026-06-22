@@ -55,9 +55,9 @@ markers = [
 ]
 
 [tool.poe.tasks]
-screen    = "python -m apps.main"
-universe  = "python -m apps.main --universe"
+screen    = "python -m core.operators.main"
+universe  = "python -m core.operators.main --universe"
 app       = "reflex run"
 auth      = "python -m core.brokers.fyers.auth"
-rank      = "python -m apps.ranker"
+rank      = "python -m core.operators.ranker"
 backtest  = "python -m core.backtest"

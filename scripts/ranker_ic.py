@@ -39,7 +39,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core import config
 from core.brokers.fyers.client import FyersClient
-from apps.ranker import StockRanker
+from core.operators.ranker import StockRanker
 
 logging.basicConfig(
     level=logging.INFO,

@@ -1,4 +1,4 @@
-"""HMM-confluence backtest entry point — `python -m runners.backtest hmm_confluence`.
+"""HMM-confluence archived backtest entry point.
 
 Delegates to the existing portfolio backtest CLI (same flags: --symbols,
 --all-symbols, --date-from/--date-to, --allow-shorts, --walk-forward, ...).

@@ -8,8 +8,7 @@ from runners._common import discover, load_manifest, require_stage
 def test_discover_finds_strategies():
     found = discover()
     assert "pead" in found
-    assert "hmm_confluence" in found
-    assert "gap_fade" in found
+    assert "momentum" in found
     assert "_template" not in found            # underscore folders skipped
 
 
@@ -46,7 +45,11 @@ def test_gate_exact_blocks_sandbox_from_live():
 
 
 def test_dropped_blocked_everywhere():
-    m = load_manifest("gap_fade")
+    m = Manifest(
+        name="tmp_dropped",
+        stage=Stage.dropped,
+        strategy_path="math:sqrt",
+    )
     with pytest.raises(SystemExit):
         require_stage(m, Stage.hypothesis)
 

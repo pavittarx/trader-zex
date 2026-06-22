@@ -6,7 +6,7 @@
 flowchart TD
     subgraph AUTH["Auth & Universe"]
         A[core/brokers/fyers/auth.py<br/>Fyers OAuth] -->|token| TOK[(~/.fyers_token.json)]
-        U[apps/universe.py<br/>Nifty 500 bulk fetch] -->|daily cache| UCACHE[(~/.trader_zex_universe.json)]
+        U[core/operators/universe.py<br/>Nifty 500 bulk fetch] -->|daily cache| UCACHE[(~/.trader_zex_universe.json)]
     end
 
     subgraph DATA["Data layer"]
@@ -31,13 +31,13 @@ flowchart TD
     TF15 --> STR
     TF60 --> HMM
 
-    CONF --> SCR[apps/screener.py<br/>orchestrate across symbols/TFs]
+    CONF --> SCR[core/operators/screener.py<br/>orchestrate across symbols/TFs]
     U --> SCR
 
     subgraph OUTPUTS["Consumers"]
-        SCR --> MAIN[apps/main.py CLI<br/>regime + signal table]
+        SCR --> MAIN[core/operators/main.py CLI<br/>regime + signal table]
         SCR --> DASH[trader_zex/<br/>Reflex web UI]
-        SCR --> RANK[apps/ranker.py<br/>multi-factor composite]
+        SCR --> RANK[core/operators/ranker.py<br/>multi-factor composite]
     end
 ```
 
