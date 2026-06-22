@@ -54,7 +54,7 @@ def run_backtest(
     output_dir : Path
         Where to save results
     cost_model : dict
-        Transaction costs: {round_trip_bps: 70} (default from manifest)
+        Transaction costs: {entry_bps: 30, exit_bps: 30} (default ~60 round-trip)
     
     Returns
     -------
@@ -66,7 +66,8 @@ def run_backtest(
     output_dir.mkdir(parents=True, exist_ok=True)
     
     if cost_model is None:
-        cost_model = {"round_trip_bps": 70}  # From GATES.md
+        # Entry: 30 bps, Exit: 30 bps = 60 bps round-trip (realistic for NSE)
+        cost_model = {"entry_bps": 30, "exit_bps": 30}
     
     log.info(f"🧪 Momentum Backtest: {date_from} to {date_to}, {n_symbols} symbols")
     log.info(f"   Output: {output_dir}")
@@ -151,9 +152,11 @@ def run_backtest(
                 
                 if price_start > 0:
                     ret = (price_end - price_start) / price_start
-                    # Deduct costs (round-trip)
-                    ret_after_costs = ret - (cost_model.get("round_trip_bps", 70) / 10000)
-                    fwd_returns.append(ret_after_costs)
+                    # Deduct costs ONLY on entry (we already paid exit last period)
+                    # This is FIRST rebalance to this position
+                    if symbol in to_add:
+                        ret -= (cost_model.get("entry_bps", 30) / 10000)
+                    fwd_returns.append(ret)
         
         if fwd_returns:
             portfolio_ret = np.mean(fwd_returns)
