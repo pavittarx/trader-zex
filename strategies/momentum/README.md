@@ -2,7 +2,7 @@
 
 **Status:** Hypothesis → Backtest → Live  
 **Universe:** Nifty 500 constituents + delisted names (survivorship-free)  
-**Rebalance:** Weekly, Friday EOD (~3:30 PM IST)  
+**Rebalance:** Quarterly (63-day cadence, anchored to Friday EOD)  
 **Turnover gate:** Only trade if portfolio drift > 1.5% (throttles costs)
 
 ---
@@ -11,7 +11,7 @@
 
 > Nifty 500 constituents exhibit 12-1 month cross-sectional momentum: stocks ranked by 12-month total returns, excluding the past month, deliver predictable outperformance the following month. The edge persists despite costs (~40–65 bps round-trip STT + spreads + slippage) because:
 > - Turnover filter (rebalance only if drift > 1.5%) throttles execution friction
-> - Weekly cadence balances signal refresh vs execution costs
+> - Quarterly cadence reduces cost drag while retaining trend persistence
 > - Factor exposure (quality, low vol, size) drives the continuation
 
 ---
@@ -43,7 +43,7 @@ All parameters live in `manifest.py:MANIFEST.params`. This ensures backtest, pap
     "lookback_months": 12,           # 12-month return window
     "ranking_months": 1,              # exclude past 1 month from rank
     "quintile": 1,                    # trade top quintile (1 = top 20%)
-    "rebalance_freq": "weekly",       # rebalance every Friday EOD
+    "rebalance_freq": "quarterly",    # 63-day cadence anchored on Friday
     "turnover_threshold_pct": 1.5,    # only trade if portfolio weight drift > 1.5%
     "max_single_position_pct": 5,     # position cap: 5% of portfolio
 }
@@ -55,6 +55,14 @@ All parameters live in `manifest.py:MANIFEST.params`. This ensures backtest, pap
 - **Target hold count:** `round(nifty_500_size / quintile_size)` ≈ 100 stocks (if quintile=1)
 - **Rebalance universe:** Point-in-time Nifty 500 constituent list for the week
 - **Cost model:** 40–65 bps round-trip (STT 15–20 bps + half-spread 10–30 bps + slippage 5–15 bps)
+
+Point-in-time universe is loaded from SQLite registry (`~/.trader_zex/data/momentum_universe.sqlite`):
+
+```bash
+uv run python -m strategies.momentum.research.universe_registry init
+uv run python -m strategies.momentum.research.universe_registry import-csv --csv strategies/momentum/research/nifty500_universe_template.csv
+uv run python -m strategies.momentum.research.universe_registry isins-at-date --date 2024-06-28
+```
 
 ---
 
@@ -73,10 +81,16 @@ All parameters live in `manifest.py:MANIFEST.params`. This ensures backtest, pap
 ## Deployment
 
 ### Paper trade (1–3 months)
-- Live Fyers EOD feed → weekly signal compute
+- Live Fyers EOD feed → quarterly signal compute
 - Simulate fills at next-day VWAP
 - Monitor realized costs, win rate, drawdown
 - **Gate:** metrics match backtest prior ±1 SE
+
+Run one paper cycle:
+
+```bash
+uv run python -m runners.paper momentum --as-of 2024-06-28 --n-symbols 50
+```
 
 ### Shadow live (1–3 months)
 - Place 10% position sizing in live market

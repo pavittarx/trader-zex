@@ -21,6 +21,7 @@ import pandas as pd
 
 from core import config
 from strategies.momentum import manifest
+from strategies.momentum.research.universe_registry import universe_symbols_at_date
 
 log = logging.getLogger(__name__)
 
@@ -28,10 +29,18 @@ log = logging.getLogger(__name__)
 _SIGNAL_CACHE_DIR = Path("~/.trader_zex/cache/momentum/signals").expanduser()
 
 
-def _cache_path(date_from: date, date_to: date) -> Path:
+def _cache_path(
+    date_from: date,
+    date_to: date,
+    symbols: list[str],
+    lookback_months: int,
+    exclude_months: int,
+) -> Path:
     """Parquet file path for signal cache."""
     import hashlib
-    key = f"signals_{date_from}_{date_to}"
+
+    symbols_key = ",".join(sorted(symbols))
+    key = f"signals_{date_from}_{date_to}_{lookback_months}_{exclude_months}_{symbols_key}"
     fname = hashlib.md5(key.encode()).hexdigest()[:16]
     return _SIGNAL_CACHE_DIR / f"{fname}.parquet"
 
@@ -69,27 +78,29 @@ def compute_12_1_returns(close_series: pd.Series,
     returns = pd.Series(np.nan, index=close_series.index)
     
     for i in range(len(close_series)):
-        current_date_idx = i
-        
-        # Earliest date we can look back to
-        start_idx = max(0, i - lookback_days)
-        
-        # Latest date we exclude
-        end_idx = max(0, i - exclude_days)
-        
-        if start_idx < end_idx:
-            price_start = close_series.iloc[start_idx]
-            price_end = close_series.iloc[end_idx]
-            
-            if price_start > 0:
-                returns.iloc[i] = (price_end - price_start) / price_start
+        # Require full lookback + exclusion window; no partial-window bootstrap.
+        if i < lookback_days or i < exclude_days:
+            continue
+
+        start_idx = i - lookback_days
+        end_idx = i - exclude_days
+
+        if start_idx >= end_idx:
+            continue
+
+        price_start = close_series.iloc[start_idx]
+        price_end = close_series.iloc[end_idx]
+
+        if price_start > 0:
+            returns.iloc[i] = (price_end - price_start) / price_start
     
     return returns
 
 
 def compute_signal_universe(universe_data: dict[str, pd.DataFrame],
                            date_from: date,
-                           date_to: date) -> pd.DataFrame:
+                           date_to: date,
+                           use_pit_universe: bool = True) -> pd.DataFrame:
     """
     Compute 12-1 ranks for all symbols on all dates.
     
@@ -130,6 +141,34 @@ def compute_signal_universe(universe_data: dict[str, pd.DataFrame],
     
     # On each date, rank symbols by 12-1 return (0-100 percentile)
     ranked = signals.rank(axis=1, pct=True) * 100
+
+    if use_pit_universe:
+        sparse_days = 0
+        for ts in ranked.index:
+            pit_symbols = set(universe_symbols_at_date(ts.date()))
+            if not pit_symbols:
+                continue
+
+            day_non_na = set(ranked.loc[ts].dropna().index)
+            if not day_non_na:
+                continue
+
+            # Guardrail: if PIT registry is still sparse/incomplete, skip masking for that day.
+            overlap = day_non_na & pit_symbols
+            min_overlap = min(50, max(5, int(len(day_non_na) * 0.5)))
+            if len(overlap) < min_overlap:
+                sparse_days += 1
+                continue
+
+            out_of_universe = list(day_non_na - pit_symbols)
+            if out_of_universe:
+                ranked.loc[ts, out_of_universe] = np.nan
+
+        if sparse_days > 0:
+            log.warning(
+                "PIT registry too sparse on %d days; fell back to data-available universe for those days",
+                sparse_days,
+            )
     
     return ranked
 
@@ -279,14 +318,17 @@ def load_or_compute_signals(universe_data: dict[str, pd.DataFrame],
     pd.DataFrame
         Signal ranks (index=date, columns=symbol, values=0-100 percentile)
     """
-    cache_path = _cache_path(date_from, date_to)
+    lookback = int(manifest.MANIFEST.params.get("lookback_months", 12))
+    exclude = int(manifest.MANIFEST.params.get("ranking_months", 1))
+    symbols = list(universe_data.keys())
+    cache_path = _cache_path(date_from, date_to, symbols, lookback, exclude)
     
     if cache_path.exists() and not force_recompute:
         log.info(f"Loading cached signals from {cache_path}")
         return pd.read_parquet(cache_path)
     
     log.info(f"Computing signals for {len(universe_data)} symbols, {date_from} to {date_to}")
-    signals = compute_signal_universe(universe_data, date_from, date_to)
+    signals = compute_signal_universe(universe_data, date_from, date_to, use_pit_universe=True)
     
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     signals.to_parquet(cache_path)
