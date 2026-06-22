@@ -25,34 +25,42 @@ backtest/sandbox/live architecture.
 | Strategy | Stage | One-liner |
 |---|---|---|
 | `pead` | **sandbox** | 20-day post-earnings drift in low-liquidity NSE names; sparse events; trade small, kill fast |
-| `hmm_confluence` | backtest | HMM regime × S/R structure signals; promotion blocked (OHLCV-sweep verdict) |
-| `gap_fade` | dropped | Daily IC was a mirage at realistic entry; cost-killed |
-| `continuation` | dropped | Real +20%/yr gross edge, eaten by turnover cost; limit-entry rescue exhausted |
-| `reversal` | dropped | Lead weakened out-of-sample (mirage) |
-| `breakout` | dropped | NR7 breakout premise wrong — gross ~ 0 |
+| `momentum` | **hypothesis** | 12-1 month cross-sectional momentum on Nifty 500; weekly rebalance with turnover gate (target Sharpe > 0.4) |
 
-The dropped folders are kept on purpose: the negative results and their
-lessons (turnover-first prioritization, intraday-timing checks) are encoded
-in the pipeline's gates.
+**Archived:** `hmm_confluence` (backtest reference implementation, signals reused in core/)  
+See [docs/research/README.md](docs/research/README.md) for sweep conclusion and lessons.
 
 ## Usage
 
 ```bash
-uv run python -m runners.list                   # strategies + stages + halt status
-uv run python -m runners.backtest pead          # NT backtest (stage >= backtest)
-uv run python -m runners.backtest hmm_confluence --all-symbols
-uv run python -m runners.sandbox pead           # paper trading (stage >= sandbox)
-uv run python -m runners.live pead --i-am-sure  # real capital (stage == live exactly)
-uv run python -m core.live.monitor pead         # kill-switch status / --reset-halt
+# List all strategies + stages + halt status
+uv run python -m runners.list
 
-# Operator apps
+# Backtest (stage >= backtest required)
+uv run python -m runners.backtest momentum          # all symbols
+uv run python -m runners.backtest momentum --all-symbols
+uv run python -m runners.backtest pead             # paper trading data
+
+# Paper trade (live data, simulated fills; stage >= sandbox required)
+export $(cat ~/.env | xargs)  # load secrets from ~/.env
+uv run python -m runners.sandbox momentum           # 100% sizing (default)
+MOMENTUM_PAPER_TRADE_SIZE_PCT=10 uv run python -m runners.sandbox momentum  # 10% sizing (shadow)
+
+# Live (real capital; stage == live exactly)
+uv run python -m runners.live momentum --i-am-sure  # needs MOMENTUM_PAPER_TRADE_SIZE_PCT=100
+
+# Kill-switch monitor + reconciliation
+uv run python -m core.live.monitor momentum         # check halt status
+uv run python -m core.live.monitor momentum --csv trades.csv --reset-halt
+
+# Operator tools
 uv run poe screen        # multi-symbol multi-timeframe regime screener
 uv run poe rank          # daily multi-factor top-N candidates
-uv run poe app           # Reflex web dashboard
-uv run poe auth          # Fyers OAuth/TOTP bootstrap
+uv run poe auth          # Fyers OAuth/TOTP bootstrap (headless + interactive)
 
 # Tests
 uv run pytest            # fast suite (slow HMM-fit tests deselected)
+uv run pytest -m slow    # include HMM-fit tests
 ```
 
 ## Layout
@@ -66,32 +74,47 @@ trader-zex/
 │   ├── research/            # vectorized harness: data+cache, cost, stats, event_study
 │   ├── backtest/            # NautilusTrader glue: loader, instruments, engine, metrics
 │   ├── live/                # kill-switch criteria, persisted halt state, monitor
-│   └── config.py            # infra config only
+│   └── config.py            # infra config only (creds, rate limits, engine defaults)
 ├── apps/                    # operator tools: screener, ranker, universe, CLI
-├── strategies/              # one folder per strategy (see table above)
-│   ├── _template/           # copy to start a new strategy
-│   └── <name>/              # manifest.py, STATUS.md, core.py, strategy.py,
-│                            #   backtest.py, research/, tests/
-├── runners/                 # stage-gated entry points (list/backtest/sandbox/live)
-├── scripts/                 # generic research CLIs (feature_ic, intraday_edge, …)
+├── strategies/              # one folder per strategy
+│   ├── _template/           # copy to start a new strategy (manifest + config template)
+│   ├── pead/                # post-earnings drift (sandbox stage; see PEAD_PLAYBOOK.md)
+│   ├── momentum/            # cross-sectional momentum (hypothesis stage; in development)
+│   └── ...
+├── runners/                 # stage-gated entry points: list, backtest, sandbox, live
+├── scripts/                 # generic research CLIs (feature_ic, intraday_edge, screener_data)
 ├── tests/                   # platform test suite
-├── docs/                    # PIPELINE, ENVIRONMENTS, guidelines, theses, playbooks
-└── trader_zex/              # Reflex web app
+├── docs/                    # PIPELINE, ENVIRONMENTS, STRATEGY_STRUCTURE, guidelines
+└── docs/research/           # archived strategies + lessons (hmm_confluence, sweep verdict)
 ```
+
+**Key: Each strategy is self-contained** — see `strategies/<name>/`:
+- `manifest.py` — contract (stage, broker, universe, params, kill_criteria)
+- `config.py` — runtime config (reads env vars; secrets from ~/.env, never in git)
+- `.env.example` — template for secrets + strategy-specific settings
+- `README.md` — hypothesis, edge, params, failure regimes
+- `PLAYBOOK.md` — kill-switch rules, deployment ladder (paper → shadow → live)
+- `STATUS.md` — stage history, findings log, kill log (human journal)
+- `strategy.py` — NautilusTrader Strategy class (backtest = live codepath)
+- `backtest.py` — runner entry point: `uv run python -m strategies.<name>.backtest`
+
+See [docs/STRATEGY_STRUCTURE.md](docs/STRATEGY_STRUCTURE.md) for the canonical reference.
 
 ## Design rules
 
 - **One NT Strategy class per strategy** — the class that backtests is the
-  class that trades live (NautilusTrader BacktestEngine ↔ TradingNode).
+  class that trades live (NautilusTrader BacktestEngine ↔ TradingNode). No parallel cron implementations.
 - **Brokers are injected, never imported by strategies** — the manifest names
   a broker (`"fyers"`), the runner resolves it via `core.brokers`. Adding a
   forex broker = one new `core/brokers/<name>/` package, zero strategy edits.
-- **Kill criteria are pre-registered** — locked in the manifest before the
-  first sandbox trade, evaluated mechanically (`core.live.risk`), halts
-  persisted; runners refuse to restart a halted strategy. No overrides.
-- **Same test, any strategy** — `core/research/event_study.py` runs the
-  identical reaction/drift/IC analysis for any event source (PEAD feeds
-  earnings dates; the next event strategy feeds its own).
+- **Kill criteria are pre-registered and mechanical** — locked in the manifest before the
+  first sandbox trade, evaluated by `core.live.risk`, halts persisted; runners refuse to restart a halted strategy. No discretionary overrides.
+- **Manifest is single source of truth** — strategy params, universe, kill_criteria live ONLY in
+  `strategies/<name>/manifest.py`, shared by backtest, paper, sandbox, and live.
+- **config.py is self-contained** — reads from manifest + environment variables; same config
+  powers backtest (no secrets), paper, sandbox, live (secrets injected). No code forks.
+- **Secrets never in code** — always in `~/.env` on host, or injected by Docker/EC2. Runners
+  load `FYERS_*` and strategy-specific env vars at startup.
 
 ## Setup
 
@@ -102,23 +125,28 @@ trader-zex/
 git clone <repo-url> && cd trader-zex && uv sync
 ```
 
-`.env` in the project root:
-
-```env
-FYERS_CLIENT_ID=YOUR_CLIENT_ID-100
-FYERS_SECRET_KEY=YOUR_SECRET_KEY
-FYERS_REDIRECT_URI=https://trade.fyers.in/api-login/redirect-uri/index.html
-# optional — unattended daily token refresh (headless TOTP):
-FYERS_FY_ID=...
-FYERS_PIN=...
-FYERS_TOTP_SECRET=...
-```
-
-Authenticate (token cached daily in `~/.fyers_token.json`):
+**Secrets:** Store in `~/.env` on your host machine (never commit to git).
 
 ```bash
-uv run poe auth
+# Fyers authentication (shared by all strategies)
+FYERS_FY_ID=YOUR_FYERS_ID
+FYERS_PIN=YOUR_FYERS_PIN
+FYERS_TOTP_SECRET=YOUR_TOTP_SECRET_KEY
+
+# Optional: backtest config
+BACKTEST_INITIAL_CAPITAL=100000
+
+# Optional: strategy-specific (e.g. for momentum)
+MOMENTUM_PAPER_TRADE_SIZE_PCT=100    # sizing for paper/shadow/live
+MOMENTUM_LOG_DIR=~/.trader_zex/logs/momentum/
 ```
+
+Authenticate once:
+```bash
+uv run poe auth  # headless (if TOTP secret set) or interactive
+```
+
+Token is cached at `~/.fyers_token.json` and auto-refreshed daily by runners.
 
 ## Dependencies
 
@@ -129,5 +157,40 @@ uv run poe auth
 [`pandas`](https://pandas.pydata.org/) / [`numpy`](https://numpy.org/) ·
 [`nsepython`](https://pypi.org/project/nsepython/) ·
 [`pyotp`](https://pypi.org/project/pyotp/) ·
-[`reflex`](https://reflex.dev/) ·
 [`python-dotenv`](https://pypi.org/project/python-dotenv/)
+
+## Quick Start: Backtest Momentum Strategy
+
+```bash
+# No secrets needed for backtest
+uv run python -m strategies.momentum.backtest --date-from 2015-01-01 --date-to 2020-12-31
+
+# Or via runner (stage-gated)
+uv run python -m runners.backtest momentum
+```
+
+Results logged to backtest output + `~/.trader_zex/logs/momentum/`
+
+## Quick Start: Paper Trade
+
+```bash
+# Load secrets
+export $(cat ~/.env | xargs)
+
+# Paper trade momentum (live Fyers feed, simulated fills)
+uv run python -m runners.sandbox momentum
+
+# Shadow live (10% sizing)
+MOMENTUM_PAPER_TRADE_SIZE_PCT=10 uv run python -m runners.sandbox momentum
+```
+
+## Documentation
+
+- [docs/PIPELINE.md](docs/PIPELINE.md) — Full lifecycle + stage gates
+- [docs/STRATEGY_STRUCTURE.md](docs/STRATEGY_STRUCTURE.md) — How to add a new strategy
+- [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md) — Backtest/sandbox/live architecture
+- [docs/STRATEGY_GUIDELINES.md](docs/STRATEGY_GUIDELINES.md) — Research discipline (hypothesis → IC → OOS)
+- [docs/PEAD_PLAYBOOK.md](docs/PEAD_PLAYBOOK.md) — Deployment runbook (apply pattern to any strategy)
+- [strategies/momentum/README.md](strategies/momentum/README.md) — Momentum hypothesis + params
+- [strategies/momentum/PLAYBOOK.md](strategies/momentum/PLAYBOOK.md) — Momentum deployment rules + kill-switch criteria
+- [strategies/pead/STATUS.md](strategies/pead/STATUS.md) — PEAD findings log + stage history
