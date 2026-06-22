@@ -29,6 +29,10 @@ from strategies.momentum.signal import get_target_portfolio, load_or_compute_sig
 POSITIONS_PATH = Path("~/.trader_zex/state/momentum_paper_positions.json").expanduser()
 
 
+def _positions_path(profile: str) -> Path:
+    return Path(f"~/.trader_zex/state/momentum_{profile}_positions.json").expanduser()
+
+
 @dataclass
 class PaperPosition:
     symbol: str
@@ -37,10 +41,10 @@ class PaperPosition:
     entry_date: str
 
 
-def _load_positions() -> dict[str, PaperPosition]:
-    if not POSITIONS_PATH.exists():
+def _load_positions(path: Path) -> dict[str, PaperPosition]:
+    if not path.exists():
         return {}
-    raw = json.loads(POSITIONS_PATH.read_text())
+    raw = json.loads(path.read_text())
     out: dict[str, PaperPosition] = {}
     for symbol, p in raw.items():
         out[symbol] = PaperPosition(
@@ -52,13 +56,13 @@ def _load_positions() -> dict[str, PaperPosition]:
     return out
 
 
-def _save_positions(pos: dict[str, PaperPosition]) -> None:
-    POSITIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
+def _save_positions(pos: dict[str, PaperPosition], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         s: {"qty": p.qty, "avg_price": p.avg_price, "entry_date": p.entry_date}
         for s, p in pos.items()
     }
-    POSITIONS_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def _nearest_vwap(df: pd.DataFrame, as_of: pd.Timestamp) -> float | None:
@@ -69,17 +73,32 @@ def _nearest_vwap(df: pd.DataFrame, as_of: pd.Timestamp) -> float | None:
     return float((r["open"] + r["high"] + r["low"] + r["close"]) / 4.0)
 
 
-def run_paper_cycle(as_of: date, n_symbols: int, lookback_days: int) -> dict:
+def run_paper_cycle(
+    as_of: date,
+    n_symbols: int,
+    lookback_days: int,
+    state_name: str = "momentum-paper",
+    profile: str = "paper",
+    market_client=None,
+    execution_client=None,
+) -> dict:
     cfg = MomentumConfig()
-    ks_state = state_store.load("momentum-paper")
+    ks_state = state_store.load(state_name)
     if ks_state.halted:
         raise RuntimeError(
-            f"momentum-paper is HALTED ({ks_state.halted_reason} @ {ks_state.halted_at}). "
-            f"Reset with: uv run python -m core.live.monitor momentum-paper --reset-halt"
+            f"{state_name} is HALTED ({ks_state.halted_reason} @ {ks_state.halted_at}). "
+            f"Reset with: uv run python -m core.live.monitor {state_name} --reset-halt"
         )
 
     date_from = as_of - timedelta(days=lookback_days)
-    universe_data = prepare_data(date_from, as_of, n_symbols=n_symbols, force_refetch=False)
+    raw_client = getattr(market_client, "raw_client", None)
+    universe_data = prepare_data(
+        date_from,
+        as_of,
+        n_symbols=n_symbols,
+        force_refetch=False,
+        client=raw_client,
+    )
     signals = load_or_compute_signals(universe_data, date_from, as_of, force_recompute=False)
     if signals.empty:
         raise RuntimeError("No signals available for paper cycle.")
@@ -93,7 +112,8 @@ def run_paper_cycle(as_of: date, n_symbols: int, lookback_days: int) -> dict:
     if not target:
         raise RuntimeError(f"No target portfolio on {signal_date.date()}.")
 
-    positions = _load_positions()
+    positions_path = _positions_path(profile)
+    positions = _load_positions(positions_path)
     current = set(positions.keys())
     to_add = target - current
     to_remove = current - target
@@ -108,6 +128,8 @@ def run_paper_cycle(as_of: date, n_symbols: int, lookback_days: int) -> dict:
         # Exit removed symbols.
         for symbol in sorted(to_remove):
             pos = positions[symbol]
+            if symbol not in universe_data:
+                continue
             px = _nearest_vwap(universe_data[symbol], signal_date)
             if px is None:
                 continue
@@ -123,6 +145,8 @@ def run_paper_cycle(as_of: date, n_symbols: int, lookback_days: int) -> dict:
                     "net_ret": round(ret, 6),
                 }
             )
+            if execution_client is not None:
+                execution_client.record_fill(state_name, symbol, "SELL", pos.qty, float(px))
             del positions[symbol]
             closed_count += 1
 
@@ -151,15 +175,17 @@ def run_paper_cycle(as_of: date, n_symbols: int, lookback_days: int) -> dict:
                     "price": round(float(px), 4),
                 }
             )
+            if execution_client is not None:
+                execution_client.record_fill(state_name, symbol, "BUY", float(qty), float(px))
 
-    _save_positions(positions)
+    _save_positions(positions, positions_path)
     reason = build_killswitch(manifest.MANIFEST).check(ks_state.net_returns)
     if reason:
         ks_state.halt(reason)
     state_store.save(ks_state)
 
     cfg.log_dir.mkdir(parents=True, exist_ok=True)
-    trades_path = cfg.log_dir / "paper_trades.csv"
+    trades_path = cfg.log_dir / f"{profile}_trades.csv"
     pd.DataFrame(trades).to_csv(
         trades_path,
         index=False,
@@ -183,10 +209,23 @@ def run_paper_cycle(as_of: date, n_symbols: int, lookback_days: int) -> dict:
         "halted": ks_state.halted,
         "halt_reason": ks_state.halted_reason,
         "trades_log": str(trades_path),
-        "positions_state": str(POSITIONS_PATH),
+        "positions_state": str(positions_path),
     }
-    report_path = cfg.log_dir / "paper_last_run.json"
+    report_path = cfg.log_dir / f"{profile}_last_run.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    observer = getattr(market_client, "observer", None)
+    if observer is not None:
+        observer.event(
+            "strategy_cycle",
+            strategy=state_name,
+            profile=profile,
+            as_of=report["as_of"],
+            n_symbols_data=report["n_symbols_data"],
+            target_count=report["target_count"],
+            trades_written=report["trades_written"],
+            closed_trades_recorded=report["closed_trades_recorded"],
+            halted=report["halted"],
+        )
     return report
 
 
@@ -195,6 +234,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--as-of", type=str, default=None, help="YYYY-MM-DD (default: today)")
     parser.add_argument("--n-symbols", type=int, default=50)
     parser.add_argument("--lookback-days", type=int, default=900)
+    parser.add_argument("--state-name", type=str, default="momentum-paper")
+    parser.add_argument("--profile", type=str, default="paper", help="storage profile (paper/sandbox)")
     args = parser.parse_args(argv)
 
     as_of = (
@@ -202,7 +243,13 @@ def main(argv: list[str] | None = None) -> None:
         if args.as_of
         else date.today()
     )
-    out = run_paper_cycle(as_of=as_of, n_symbols=args.n_symbols, lookback_days=args.lookback_days)
+    out = run_paper_cycle(
+        as_of=as_of,
+        n_symbols=args.n_symbols,
+        lookback_days=args.lookback_days,
+        state_name=args.state_name,
+        profile=args.profile,
+    )
     print(json.dumps(out, indent=2))
 
 

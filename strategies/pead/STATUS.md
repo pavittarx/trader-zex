@@ -28,6 +28,11 @@ round-trip cost is amortized over a 20-day move rather than a daily rebalance.
   not the accounting surprise, carries the signal (PEAD_THESIS.md).
 - In-sample = one ~2yr regime. NOT cross-regime validated. The forward sandbox
   run IS the out-of-sample test.
+- 2026-06-23: Added paper execution loop (`strategies/pead/paper.py`) compatible with `runners.paper`:
+  reaction-day entries, hold/stop/corp-action exits, persisted paper state, and kill-switch checks.
+- 2026-06-23: Added sandbox entrypoint (`strategies/pead/sandbox.py`) so `runners.sandbox pead` now executes a forward one-shot cycle under manifest kill-switch state.
+- 2026-06-23: Added sandbox forward monitor (`strategies/pead/sandbox_monitor.py`) to replay daily cycles over a date range and emit gate metrics (events, win rate, Sharpe, DD, halt status).
+- 2026-06-23: Sandbox I/O now uses shared Fyers session (`core.live.fyers_sandbox.get_shared_session`) so PEAD and Momentum can reuse one market-data login and sandbox execution ledger in a single process.
 
 ## Kill / drop log
 
@@ -35,13 +40,14 @@ round-trip cost is amortized over a 20-day move rather than a daily rebalance.
 
 ## Milestones to live (docs/ENVIRONMENTS.md gates)
 
-1. **[next] TOTP auth workflow:** the headless login *code* is done
+1. **TOTP auth workflow:** the headless login *code* is done
    (`core/brokers/fyers/auth.py`), but the workflow isn't: (a) enable external
    TOTP on the Fyers account + capture the base32 secret into `.env`
    (`FYERS_FY_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET`), (b) verify `poe auth`
    mints a token with no prompt, (c) daily ~08:45 IST refresh cron with
    failure alerting. Hard dependency for everything below.
-2. **Sandbox infra (7b):** Fyers NT `LiveMarketDataClient` (poll daily
+2. **[next] Sandbox infra (7b):** one-shot sandbox runner is now wired; remaining work is full
+   Fyers NT `LiveMarketDataClient` (poll daily
    bars) + `SandboxExecutionClient` TradingNode. Untestable offline — build +
    iterate on EC2 in market hours.
 3. **Sandbox gate:** 2–3 months / ≥ 15 events, no kill-criterion fired, metrics

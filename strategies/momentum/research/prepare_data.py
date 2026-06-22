@@ -45,7 +45,13 @@ NIFTY_500 = [
 NIFTY_500_TEST = NIFTY_500[:50]  # Start with 50 for faster iteration
 
 
-def prepare_data(date_from: date, date_to: date, n_symbols: int = 50, force_refetch: bool = False) -> dict[str, pd.DataFrame]:
+def prepare_data(
+    date_from: date,
+    date_to: date,
+    n_symbols: int = 50,
+    force_refetch: bool = False,
+    client: FyersClient | None = None,
+) -> dict[str, pd.DataFrame]:
     """Fetch and cache Nifty 500 OHLCV.
     
     Parameters
@@ -64,7 +70,7 @@ def prepare_data(date_from: date, date_to: date, n_symbols: int = 50, force_refe
     dict[str, DataFrame]
         {symbol: daily_ohlcv_df} for all successfully fetched symbols
     """
-    client = FyersClient()  # Uses headless TOTP by default
+    client = client or FyersClient()  # Uses headless TOTP by default
     
     symbols = NIFTY_500 if n_symbols > 500 else NIFTY_500_TEST[:n_symbols]
     universe_data = {}
