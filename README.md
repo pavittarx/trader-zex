@@ -148,6 +148,8 @@ uv run poe auth  # headless (if TOTP secret set) or interactive
 
 Token is cached at `~/.fyers_token.json` and auto-refreshed daily by runners.
 
+See [docs/FYERS_AUTH.md](docs/FYERS_AUTH.md) for detailed auth flows, TOTP setup, troubleshooting, and EC2/sandbox automation.
+
 ## Dependencies
 
 [`nautilus-trader`](https://nautilustrader.io/) (event-driven backtest/live engine, pinned 1.226) ·
@@ -186,6 +188,7 @@ MOMENTUM_PAPER_TRADE_SIZE_PCT=10 uv run python -m runners.sandbox momentum
 
 ## Documentation
 
+- [docs/FYERS_AUTH.md](docs/FYERS_AUTH.md) — Authentication flows: interactive (dev) + headless TOTP (production/EC2)
 - [docs/PIPELINE.md](docs/PIPELINE.md) — Full lifecycle + stage gates
 - [docs/STRATEGY_STRUCTURE.md](docs/STRATEGY_STRUCTURE.md) — How to add a new strategy
 - [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md) — Backtest/sandbox/live architecture
