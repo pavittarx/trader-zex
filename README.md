@@ -180,26 +180,34 @@ See [docs/FYERS_AUTH.md](docs/FYERS_AUTH.md) for detailed auth flows, TOTP setup
 
 ## Docker
 
-A self-contained image runs any runner/strategy. Secrets are **never** baked in —
-Fyers credentials come from the environment at run time, and the daily token is
-mounted read-only.
+One image, one container per strategy. Build on local or EC2, deploy when you're
+ready — no CI involved. Secrets live on the host at `~/zex/.<strategy>.env` and
+are **never** baked into the image.
 
 ```bash
-make docker-build                          # builds trader-zex:<git-sha> + :latest
-make docker-run ARGS="-m runners.list"     # uses ./.env + ~/.fyers_token.json if present
-make docker-push REGISTRY=ghcr.io/<you>    # push both tags
+# Build
+make docker-build
+make docker-push REGISTRY=ghcr.io/<you>   # optional: push to a registry
 
-# run anything by overriding the args:
-docker run --rm --env-file .env trader-zex:latest \
-  -m strategies.momentum.research.momentum_ic --github --universe all --pit-top-k 200
-docker run --rm --env-file .env \
-  -v ~/.fyers_token.json:/home/trader/.fyers_token.json:ro \
-  trader-zex:latest -m runners.sandbox pead
+# Run interactively (test / one-off)
+make docker-run   STRATEGY=momentum RUNNER=sandbox
+make docker-run   STRATEGY=pead     RUNNER=backtest
+
+# Deploy (detached, auto-restarts on crash/reboot)
+make docker-deploy  STRATEGY=momentum RUNNER=sandbox
+make docker-logs    STRATEGY=momentum
+make docker-stop    STRATEGY=momentum
 ```
 
-CI build/push is available as a ready-to-use GHCR workflow template at
-`deploy/docker-publish.yml` — copy it into `.github/workflows/` to enable
-automatic builds on pushes to `main` and `v*` tags (not on PRs).
+Env file format (`~/zex/.momentum.env`):
+```bash
+FYERS_CLIENT_ID=...
+FYERS_SECRET_KEY=...
+FYERS_FY_ID=...
+FYERS_PIN=...
+FYERS_TOTP_SECRET=...
+MOMENTUM_PAPER_TRADE_SIZE_PCT=100
+```
 
 ## Dependencies
 
