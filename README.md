@@ -22,10 +22,13 @@ backtest/sandbox/live architecture.
 
 ## Strategies
 
-| Strategy | Stage | One-liner |
-|---|---|---|
-| `pead` | **sandbox** | 20-day post-earnings drift in low-liquidity NSE names; sparse events; trade small, kill fast |
-| `momentum` | **hypothesis** | 12-1 month cross-sectional momentum on Nifty 500; quarterly rebalance with turnover gate |
+| Strategy | One-liner |
+|---|---|
+| `pead` | 20-day post-earnings drift in low-liquidity NSE names; sparse events; trade small, kill fast |
+| `momentum` | 12-1 month cross-sectional momentum on Nifty 500; quarterly rebalance with turnover gate |
+
+**Current stage/source of truth:** `manifest.py` for each strategy.  
+Run `uv run python -m runners.list` to see live stage status (avoids README drift).
 
 **Archived:** `hmm_confluence` (backtest reference implementation, signals reused in core/)  
 See [docs/research/README.md](docs/research/README.md) for sweep conclusion and lessons.
@@ -80,8 +83,8 @@ trader-zex/
 ├── apps/                    # operator tools: screener, ranker, universe, CLI
 ├── strategies/              # one folder per strategy
 │   ├── _template/           # copy to start a new strategy (manifest + config template)
-│   ├── pead/                # post-earnings drift (sandbox stage; see PEAD_PLAYBOOK.md)
-│   ├── momentum/            # cross-sectional momentum (hypothesis stage; in development)
+│   ├── pead/                # post-earnings drift
+│   ├── momentum/            # cross-sectional momentum
 │   └── ...
 ├── runners/                 # stage-gated entry points: list, backtest, sandbox, live
 ├── scripts/                 # generic research CLIs (feature_ic, intraday_edge, screener_data)

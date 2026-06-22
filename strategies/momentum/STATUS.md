@@ -1,17 +1,18 @@
 # Cross-sectional Momentum — STATUS
 
-**Stage:** hypothesis (mirror of `manifest.py:MANIFEST.stage` — keep in sync)  
+**Stage:** backtest (mirror of `manifest.py:MANIFEST.stage` — keep in sync)  
 **Broker:** fyers
 
 ## Hypothesis
 
-Nifty 500 constituents exhibit mean reversion on intra-month horizons but momentum on 12-1 month cross-sectional return rank. Top quintile (highest 12-month total returns, excluding past month) experiences continued outperformance driven by factor exposure (quality, low volatility) and retail underweight. The edge persists despite costs (~40–65 bps round-trip after STT + spreads) because turnover filter (only trade if portfolio drift > 1.5%) throttles rebalancing churn. Weekly rebalance balances signal refresh against execution friction.
+Nifty 500 constituents exhibit mean reversion on intra-month horizons but momentum on 12-1 month cross-sectional return rank. Top quintile (highest 12-month total returns, excluding past month) experiences continued outperformance driven by factor exposure (quality, low volatility) and retail underweight. The edge persists despite costs (~40–65 bps round-trip after STT + spreads) because turnover filter (only trade if portfolio drift > 1.5%) throttles rebalancing churn. Quarterly rebalance reduces cost drag versus weekly.
 
 ## Stage history
 
 | Date | Stage | Evidence / decision |
 |------|-------|---------------------|
 | 2026-06-23 | hypothesis | Initialized; plan: 12-1 lookback on Nifty 500 constituents, quarterly rebalance with turnover gate. IC target >= 0.03. |
+| 2026-06-23 | backtest | Promoted after PIT-aware signal/backtest pipeline, cadence testing, and paper-runner implementation. |
 
 ## Findings log
 
