@@ -1,0 +1,21 @@
+# keep the build context (and image) small
+.git
+.github
+.venv
+**/__pycache__
+**/*.py[cod]
+.web
+.states
+*.log
+.env
+.env.*
+!.env.example
+# local research caches / state (regenerated at runtime)
+**/.trader_zex*
+**/nifty500_cache
+*.parquet
+*.db
+# editor / OS cruft
+.idea
+.vscode
+.DS_Store
