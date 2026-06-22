@@ -21,7 +21,7 @@ Logic
 Usage
 -----
     from core.brokers.fyers.client import FyersClient
-    from apps.ranker import StockRanker
+    from core.operators.ranker import StockRanker
 
     client = FyersClient()
     ranker = StockRanker(client, n_top=25)
@@ -51,7 +51,7 @@ from core.brokers.fyers.client import FyersClient, RESAMPLE_RULES, resample_ohlc
 from core.signals.hmm_model import HMMModel
 from core.signals.structure import StructureDetector
 from core.signals.confluence import generate_signal
-from apps.universe import get_tradable_universe
+from core.operators.universe import get_tradable_universe
 
 log = logging.getLogger(__name__)
 

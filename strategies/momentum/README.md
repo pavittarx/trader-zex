@@ -114,6 +114,7 @@ uv run python -m runners.paper momentum --as-of 2024-06-28 --n-symbols 50
 | `signal.py` | 12-1 momentum compute (expanding window, no look-ahead) |
 | `strategy.py` | NautilusTrader Strategy class (backtest + live) |
 | `backtest.py` | Runner entry point (calls core.backtest.engine) |
+| `research/README.md` | Research script map (triage, walk-forward, verification, experiments) |
 | `PLAYBOOK.md` | Detailed position sizing, kill-switch rules, OOS interpretation |
 | `STATUS.md` | Stage history, findings log, kill log (updated per phase) |
 

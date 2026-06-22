@@ -82,7 +82,7 @@ trader-zex/
 │   ├── backtest/            # NautilusTrader glue: loader, instruments, engine, metrics
 │   ├── live/                # kill-switch criteria, persisted halt state, monitor
 │   └── config.py            # infra config only (creds, rate limits, engine defaults)
-├── apps/                    # operator tools: screener, ranker, universe, CLI
+├── core/operators/          # operator tools: screener, ranker, universe, CLI
 ├── strategies/              # one folder per strategy
 │   ├── _template/           # copy to start a new strategy (manifest + config template)
 │   ├── pead/                # post-earnings drift

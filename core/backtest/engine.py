@@ -14,9 +14,11 @@ Usage
 
 from __future__ import annotations
 
+import importlib
 import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import Any
 
 import pandas as pd
 from nautilus_trader.backtest.engine import BacktestEngine, BacktestEngineConfig
@@ -31,11 +33,34 @@ from core import config
 from core.backtest.data_loader import df_to_bars, make_bar_type
 from core.backtest.instruments import make_equity, fyers_to_instrument_id
 from core.backtest.signal_precompute import compute_rolling_signals, make_cache_key
-from strategies.hmm_confluence.strategy import HMMConfluenceStrategy, HMMStrategyConfig
 
 log = logging.getLogger(__name__)
 
 _NSE_VENUE = Venue("NSE")
+
+
+def _load_hmm_strategy_classes() -> tuple[type[Any], type[Any]]:
+    """
+    Resolve archived HMM strategy classes from the first available module path.
+
+    The canonical runtime path used to be ``strategies.hmm_confluence.strategy``.
+    After archival, the implementation lives under ``docs.research.hmm_confluence``.
+    """
+    candidates = (
+        "strategies.hmm_confluence.strategy",
+        "docs.research.hmm_confluence.strategy",
+    )
+    for mod_path in candidates:
+        try:
+            mod = importlib.import_module(mod_path)
+            return mod.HMMConfluenceStrategy, mod.HMMStrategyConfig
+        except ModuleNotFoundError:
+            continue
+    raise ModuleNotFoundError(
+        "Could not load HMM confluence strategy classes. "
+        "Expected one of: strategies.hmm_confluence.strategy, "
+        "docs.research.hmm_confluence.strategy."
+    )
 
 
 @dataclass
@@ -98,6 +123,7 @@ def run_backtest(
         date_to = date.today()
     if date_from is None:
         date_from = date_to - timedelta(days=90)
+    HMMConfluenceStrategy, HMMStrategyConfig = _load_hmm_strategy_classes()
 
     log.info("Backtesting %s  [%s → %s]", fyers_sym, date_from, date_to)
 
@@ -208,13 +234,14 @@ def run_backtest_portfolio(
         date_to = date.today()
     if date_from is None:
         date_from = date_to - timedelta(days=90)
+    HMMConfluenceStrategy, HMMStrategyConfig = _load_hmm_strategy_classes()
 
     log.info("Portfolio backtest: %d symbols [%s → %s]", len(fyers_syms), date_from, date_to)
 
     # 1. Build a single engine for the whole portfolio
     engine = build_engine(log_level=log_level)
 
-    strategies: dict[str, HMMConfluenceStrategy] = {}
+    strategies: dict[str, Any] = {}
     symbols_added: list[str] = []
 
     for fyers_sym in fyers_syms:

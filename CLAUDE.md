@@ -29,16 +29,14 @@ log). Runners enforce the stage gates.
 | `core/research/` | Vectorized harness: `data` (chunked fetch + parquet cache), `cost`, `stats` (sharpe/t/IC/DD), `event_study` (reaction/drift/IC — strategy-agnostic), `events_nse` (earnings dates), `report` |
 | `core/backtest/` | NautilusTrader glue: data_loader (IST→UTC), instruments, signal_precompute (no look-ahead, disk-cached), engine, metrics |
 | `core/live/` | `risk.py` (KillSwitch criteria registry), `state.py` (persisted halt state `~/.trader_zex/state/`), `monitor.py` (offline kill-check CLI) |
-| `apps/` | Operator tools consuming core: screener, ranker, universe, main (screener CLI). NOT importable by strategies |
+| `core/operators/` | Operator tools consuming core: screener, ranker, universe, main (screener CLI). NOT importable by strategies |
 | `strategies/<name>/` | manifest.py, STATUS.md, core.py (signal/risk logic), strategy.py (the ONE NT Strategy: backtest = live), backtest.py (runner entry), research/, tests/ |
 | `runners/` | `list`, `backtest`, `sandbox`, `live` — stage-gated entry points |
 | `scripts/` | Generic research CLIs only (feature_ic, intraday_edge, ranker_ic, screener_data) |
 | `trader_zex/` + `rxconfig.py` | Reflex web dashboard |
 
 Current strategies: **pead** (stage: sandbox — see its STATUS.md milestones),
-**hmm_confluence** (backtest; promotion blocked per OHLCV-sweep verdict),
-gap_fade / reversal / breakout / continuation (dropped — post-mortems in their
-STATUS.md). New strategy: copy `strategies/_template/`.
+**momentum** (stage: backtest). New strategy: copy `strategies/_template/`.
 
 ## Commands
 
@@ -47,13 +45,13 @@ This project uses **`uv`** and **poe** tasks (see `pyproject.toml`).
 ```bash
 uv run python -m runners.list                  # all strategies + stages + halt status
 uv run python -m runners.backtest pead         # stage >= backtest enforced
-uv run python -m runners.backtest hmm_confluence --all-symbols
+uv run python -m runners.backtest momentum --all-symbols
 uv run python -m runners.sandbox pead          # stage >= sandbox + not halted
 uv run python -m runners.live pead --i-am-sure # stage == live EXACTLY
 uv run python -m core.live.monitor pead [--csv trades.csv | --reset-halt]
 
-uv run poe screen        # screener (apps/main.py)
-uv run poe rank          # daily ranked stocks (apps/ranker.py)
+uv run poe screen        # screener (core/operators/main.py)
+uv run poe rank          # daily ranked stocks (core/operators/ranker.py)
 uv run poe backtest      # legacy HMM portfolio backtest CLI (core/backtest)
 uv run poe app           # reflex web dashboard
 uv run poe auth          # Fyers OAuth/TOTP bootstrap
