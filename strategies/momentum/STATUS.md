@@ -36,6 +36,7 @@ Nifty 500 constituents exhibit mean reversion on intra-month horizons but moment
   - `strategies/momentum/paper.py` simulates quarterly rebalance with VWAP fills and persists paper positions/trades.
   - `runners/paper.py` added for runner-based paper mode (`python -m runners.paper <strategy> ...`), gated at stage >= backtest.
   - Smoke run (`--as-of 2024-06-28`) executed successfully: 8 simulated BUY trades, state persisted, kill-switch not tripped.
+- 2026-06-23: Added momentum sandbox entrypoint (`strategies/momentum/sandbox.py`) using shared Fyers sandbox session so it can reuse market/execution I/O with PEAD when promoted to sandbox stage.
 
 ## Kill / drop log
 

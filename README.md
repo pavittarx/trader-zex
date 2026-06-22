@@ -47,9 +47,11 @@ uv run python -m runners.backtest pead             # paper trading data
 # Paper trade (live data, simulated fills; stage >= backtest required)
 export $(cat ~/.env | xargs)  # load secrets from ~/.env
 uv run python -m runners.paper momentum --as-of 2024-06-28 --n-symbols 50
+uv run python -m runners.paper pead --as-of 2024-06-28
 
 # Sandbox (TradingNode paper fills; stage >= sandbox required)
 uv run python -m runners.sandbox pead
+uv run python -m strategies.pead.sandbox_monitor --date-from 2024-01-01 --date-to 2024-06-30 --reset
 
 # Live (real capital; stage == live exactly)
 uv run python -m runners.live pead --i-am-sure
@@ -117,6 +119,12 @@ See [docs/STRATEGY_STRUCTURE.md](docs/STRATEGY_STRUCTURE.md) for the canonical r
 
 Runners enforce these gates through `manifest.py:stage`; promotion/demotion must be recorded in `STATUS.md`.
 
+For sandbox/paper Fyers workflows, strategies can share one in-process I/O
+session (`core.live.fyers_sandbox.get_shared_session`) so market-data auth and
+sandbox execution are not duplicated per strategy.
+Shared-session observability is written as JSONL to:
+`~/.trader_zex/logs/sandbox/shared_session.jsonl`.
+
 ## Canonical strategy structure
 
 Each strategy under `strategies/<name>/` should include:
@@ -167,6 +175,13 @@ BACKTEST_INITIAL_CAPITAL=100000
 # Optional: strategy-specific (e.g. for momentum)
 MOMENTUM_PAPER_TRADE_SIZE_PCT=100    # sizing for paper/shadow/live
 MOMENTUM_LOG_DIR=~/.trader_zex/logs/momentum/
+
+# Optional: Parseable observability sink (sandbox/paper structured events)
+PARSEABLE_URL=http://localhost:8000
+PARSEABLE_USERNAME=admin
+PARSEABLE_PASSWORD=admin
+PARSEABLE_STREAM=trader_zex_sandbox
+PARSEABLE_VERIFY_TLS=false
 ```
 
 Authenticate once:
@@ -217,6 +232,7 @@ MOMENTUM_PAPER_TRADE_SIZE_PCT=10 uv run python -m runners.sandbox momentum
 ## Documentation
 
 - [docs/FYERS_AUTH.md](docs/FYERS_AUTH.md) — Authentication flows: interactive (dev) + headless TOTP (production/EC2)
+- [docs/EC2_DEPLOYMENT.md](docs/EC2_DEPLOYMENT.md) — EC2 runbook + Parseable UI logging setup
 - [docs/PIPELINE.md](docs/PIPELINE.md) — Full lifecycle + stage gates
 - [docs/STRATEGY_STRUCTURE.md](docs/STRATEGY_STRUCTURE.md) — How to add a new strategy
 - [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md) — Backtest/sandbox/live architecture
