@@ -16,8 +16,20 @@ class FyersDataAdapter(DataAdapter):
     """Fyers API v3 — NSE equities. Timestamps are IST-naive."""
 
     def __init__(self, access_token: str | None = None,
-                 client: FyersClient | None = None):
-        self._client = client or FyersClient(access_token=access_token)
+                 client: FyersClient | None = None,
+                 require_headless: bool = False):
+        """
+        Parameters
+        ----------
+        access_token : str | None
+            Explicit token. If None, login() is called (cache → headless → interactive).
+        client : FyersClient | None
+            Pre-instantiated client. If None, FyersClient is created.
+        require_headless : bool
+            If True, require headless (TOTP) auth; fail if env vars missing.
+            Useful for EC2/sandbox/CI to prevent interactive prompts.
+        """
+        self._client = client or FyersClient(access_token=access_token, require_headless=require_headless)
 
     @property
     def venue(self) -> str:

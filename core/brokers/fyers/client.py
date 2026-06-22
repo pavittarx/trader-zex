@@ -74,13 +74,20 @@ def resample_ohlcv(df: pd.DataFrame, rule: str) -> pd.DataFrame:
 
 
 class FyersClient:
-    def __init__(self, access_token: str | None = None) -> None:
+    def __init__(self, access_token: str | None = None, require_headless: bool = False) -> None:
         """
-        Pass an *access_token* directly, or leave None to trigger the
-        interactive login flow (checks cache first, prompts if needed).
+        Initialize authenticated Fyers client.
+        
+        Parameters
+        ----------
+        access_token : str | None
+            Explicit token. If None, login() is called (cache → headless → interactive).
+        require_headless : bool
+            If True, require headless (TOTP) auth; fail if env vars missing.
+            Useful for EC2/sandbox/CI to prevent interactive prompts.
         """
         if access_token is None:
-            access_token = auth.login()   # cached → headless (TOTP) → interactive
+            access_token = auth.login(require_headless=require_headless)
 
         self._fyers = fyersModel.FyersModel(
             client_id=config.FYERS_CLIENT_ID,

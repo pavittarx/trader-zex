@@ -196,16 +196,48 @@ def headless_login() -> str:
     return token
 
 
-def login() -> str:
-    """Return a valid access token: cached → headless (if creds) → interactive."""
+def login(require_headless: bool = False) -> str:
+    """Return a valid access token.
+    
+    Fallback chain (in order):
+      1. Check cache (same day's token)
+      2. Try headless TOTP login (requires FYERS_FY_ID, FYERS_PIN, FYERS_TOTP_SECRET)
+      3. Fall back to interactive browser login (if require_headless=False)
+    
+    Parameters
+    ----------
+    require_headless : bool
+        If True, raise if headless login fails (e.g., for EC2/CI/CD).
+        If False, fall back to interactive login (e.g., for local dev).
+    
+    Returns
+    -------
+    str
+        A valid Fyers access token.
+    """
     token = load_token()
     if token:
         return token
+    
+    # Try headless TOTP login first (preferred for production/EC2)
     if config.FYERS_FY_ID and config.FYERS_PIN and config.FYERS_TOTP_SECRET:
         try:
             return headless_login()
         except Exception as exc:
+            if require_headless:
+                raise RuntimeError(
+                    f"Headless login required but failed: {exc}. "
+                    "Check FYERS_FY_ID, FYERS_PIN, FYERS_TOTP_SECRET in .env"
+                ) from exc
             log.warning("Headless login failed (%s); falling back to interactive.", exc)
+    
+    # Fall back to interactive browser login
+    if require_headless:
+        raise RuntimeError(
+            "Headless login required but FYERS_FY_ID/FYERS_PIN/FYERS_TOTP_SECRET not set. "
+            "Set these in .env for unattended auth."
+        )
+    
     return interactive_login()
 
 
