@@ -178,6 +178,29 @@ Token is cached at `~/.fyers_token.json` and auto-refreshed daily by runners.
 
 See [docs/FYERS_AUTH.md](docs/FYERS_AUTH.md) for detailed auth flows, TOTP setup, troubleshooting, and EC2/sandbox automation.
 
+## Docker
+
+A self-contained image runs any runner/strategy. Secrets are **never** baked in —
+Fyers credentials come from the environment at run time, and the daily token is
+mounted read-only.
+
+```bash
+make docker-build                          # builds trader-zex:<git-sha> + :latest
+make docker-run ARGS="-m runners.list"     # uses ./.env + ~/.fyers_token.json if present
+make docker-push REGISTRY=ghcr.io/<you>    # push both tags
+
+# run anything by overriding the args:
+docker run --rm --env-file .env trader-zex:latest \
+  -m strategies.momentum.research.momentum_ic --github --universe all --pit-top-k 200
+docker run --rm --env-file .env \
+  -v ~/.fyers_token.json:/home/trader/.fyers_token.json:ro \
+  trader-zex:latest -m runners.sandbox pead
+```
+
+CI build/push is available as a ready-to-use GHCR workflow template at
+`deploy/docker-publish.yml` — copy it into `.github/workflows/` to enable
+automatic builds on pushes to `main` and `v*` tags (not on PRs).
+
 ## Dependencies
 
 [`nautilus-trader`](https://nautilustrader.io/) (event-driven backtest/live engine, pinned 1.226) ·
