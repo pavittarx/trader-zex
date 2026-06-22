@@ -37,6 +37,7 @@ import pandas as pd
 
 from core import config as core_config
 from strategies.momentum.manifest import MANIFEST
+from strategies.momentum.research.universe_registry import universe_isins_at_date
 
 _P = MANIFEST.params
 
@@ -70,9 +71,16 @@ class MomentumConfig:
         Returns list of ISINs (e.g. ["INE002A01018", "INE004A01024", ...]).
         Point-in-time: only constituents that were in the index at as_of.
         """
-        # TODO: implement point-in-time universe lookup (NSE master data)
-        # For now, return a placeholder
-        raise NotImplementedError("universe_nifty500() — integrate NSE constituent history")
+        as_of = as_of or date.today()
+        isins = universe_isins_at_date(as_of)
+        if not isins:
+            raise RuntimeError(
+                "No point-in-time universe found in registry. "
+                "Initialize/import registry with: "
+                "uv run python -m strategies.momentum.research.universe_registry init && "
+                "uv run python -m strategies.momentum.research.universe_registry import-csv --csv <path>"
+            )
+        return isins
 
     def cost_model(self) -> dict:
         """Return cost breakdown (bps per round-trip).

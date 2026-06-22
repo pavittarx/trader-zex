@@ -14,7 +14,7 @@ MANIFEST = Manifest(
         "lookback_months": 12,
         "ranking_months": 1,
         "quintile": 1,  # top quintile
-        "rebalance_freq": "weekly",
+        "rebalance_freq": "quarterly",
         "turnover_threshold_pct": 1.5,  # only trade if position change > 1.5% of portfolio
         "max_single_position_pct": 5,
     },
@@ -23,5 +23,5 @@ MANIFEST = Manifest(
         KillCriterion("drawdown", {"dd_limit": 0.15}),
         KillCriterion("trailing_winrate", {"window": 20, "floor": 0.45}),
     ],
-    notes="12-1 month cross-sectional momentum, weekly rebalance, Nifty 500",
+    notes="12-1 month cross-sectional momentum, quarterly rebalance, Nifty 500",
 )

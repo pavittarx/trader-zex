@@ -25,7 +25,7 @@ backtest/sandbox/live architecture.
 | Strategy | Stage | One-liner |
 |---|---|---|
 | `pead` | **sandbox** | 20-day post-earnings drift in low-liquidity NSE names; sparse events; trade small, kill fast |
-| `momentum` | **hypothesis** | 12-1 month cross-sectional momentum on Nifty 500; weekly rebalance with turnover gate (target Sharpe > 0.4) |
+| `momentum` | **hypothesis** | 12-1 month cross-sectional momentum on Nifty 500; quarterly rebalance with turnover gate |
 
 **Archived:** `hmm_confluence` (backtest reference implementation, signals reused in core/)  
 See [docs/research/README.md](docs/research/README.md) for sweep conclusion and lessons.
@@ -41,13 +41,15 @@ uv run python -m runners.backtest momentum          # all symbols
 uv run python -m runners.backtest momentum --all-symbols
 uv run python -m runners.backtest pead             # paper trading data
 
-# Paper trade (live data, simulated fills; stage >= sandbox required)
+# Paper trade (live data, simulated fills; stage >= backtest required)
 export $(cat ~/.env | xargs)  # load secrets from ~/.env
-uv run python -m runners.sandbox momentum           # 100% sizing (default)
-MOMENTUM_PAPER_TRADE_SIZE_PCT=10 uv run python -m runners.sandbox momentum  # 10% sizing (shadow)
+uv run python -m runners.paper momentum --as-of 2024-06-28 --n-symbols 50
+
+# Sandbox (TradingNode paper fills; stage >= sandbox required)
+uv run python -m runners.sandbox pead
 
 # Live (real capital; stage == live exactly)
-uv run python -m runners.live momentum --i-am-sure  # needs MOMENTUM_PAPER_TRADE_SIZE_PCT=100
+uv run python -m runners.live pead --i-am-sure
 
 # Kill-switch monitor + reconciliation
 uv run python -m core.live.monitor momentum         # check halt status
@@ -99,6 +101,29 @@ trader-zex/
 - `backtest.py` — runner entry point: `uv run python -m strategies.<name>.backtest`
 
 See [docs/STRATEGY_STRUCTURE.md](docs/STRATEGY_STRUCTURE.md) for the canonical reference.
+
+## Process: from idea to capital
+
+1. **Hypothesis:** define edge, failure regimes, falsifiers in `README.md` + `STATUS.md`.
+2. **Triage:** run cheap IC/event tests in `research/`; kill weak ideas fast.
+3. **Vectorized:** prove no look-ahead/survivorship leakage and net-of-cost viability.
+4. **Backtest:** run stage-gated strategy backtests with realistic fills/costs.
+5. **Paper:** run `runners.paper` cycles (live/cached data, simulated fills, persisted state).
+6. **Sandbox:** run TradingNode sandbox for forward OOS monitoring.
+7. **Live:** only after evidence is consistent and kill-criteria are locked.
+
+Runners enforce these gates through `manifest.py:stage`; promotion/demotion must be recorded in `STATUS.md`.
+
+## Canonical strategy structure
+
+Each strategy under `strategies/<name>/` should include:
+- `manifest.py` (stage, params, broker, kill criteria — machine contract)
+- `config.py` (runtime wiring from manifest + env vars)
+- `README.md` (hypothesis, assumptions, process)
+- `PLAYBOOK.md` (ops runbook: paper → shadow → live)
+- `STATUS.md` (stage history and findings log)
+- `strategy.py` + `backtest.py` (single codepath philosophy for backtest/live)
+- `research/` and `tests/` for signal validation and regression coverage
 
 ## Design rules
 
