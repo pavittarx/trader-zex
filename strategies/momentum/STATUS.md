@@ -36,6 +36,16 @@ Nifty 500 constituents exhibit mean reversion on intra-month horizons but moment
   - `strategies/momentum/paper.py` simulates quarterly rebalance with VWAP fills and persists paper positions/trades.
   - `runners/paper.py` added for runner-based paper mode (`python -m runners.paper <strategy> ...`), gated at stage >= backtest.
   - Smoke run (`--as-of 2024-06-28`) executed successfully: 8 simulated BUY trades, state persisted, kill-switch not tripped.
+<<<<<<< HEAD
+- 2026-06-23: Independent cross-check on public split-adjusted GitHub NIFTY500 data
+  (`strategies/momentum/research/momentum_ic.py`, self-test-verified harness;
+  full write-up in `docs/MOMENTUM_THESIS.md`). Corroborates a real but modest edge:
+  full-universe pooled IC t 3.3, but ~40% is survivorship inflation — with a
+  point-in-time top-200-by-liquidity universe (no look-ahead) IC t ~2.0, long-only
+  alpha ~0.9%/mo (t 3.2) beyond beta, L/S net Sharpe ~0.5. Crash overlays
+  (vol-scaling + trend filter) lift in-sample Sharpe but don't cut the ~−40%
+  2014 up-market rotation tail. Consistent with the Fyers-data pipeline above;
+  reinforces that the honest, survivorship-corrected number is modest (~0.5 Sharpe).
 - 2026-06-23: Added momentum sandbox entrypoint (`strategies/momentum/sandbox.py`) using shared Fyers sandbox session so it can reuse market/execution I/O with PEAD when promoted to sandbox stage.
 
 ## Kill / drop log

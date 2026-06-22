@@ -193,6 +193,37 @@ Token is cached at `~/.fyers_token.json` and auto-refreshed daily by runners.
 
 See [docs/FYERS_AUTH.md](docs/FYERS_AUTH.md) for detailed auth flows, TOTP setup, troubleshooting, and EC2/sandbox automation.
 
+## Docker
+
+One image, one container per strategy. Build on local or EC2, deploy when you're
+ready — no CI involved. Secrets live on the host at `~/zex/.<strategy>.env` and
+are **never** baked into the image.
+
+```bash
+# Build
+make docker-build
+make docker-push REGISTRY=ghcr.io/<you>   # optional: push to a registry
+
+# Run interactively (test / one-off)
+make docker-run   STRATEGY=momentum RUNNER=sandbox
+make docker-run   STRATEGY=pead     RUNNER=backtest
+
+# Deploy (detached, auto-restarts on crash/reboot)
+make docker-deploy  STRATEGY=momentum RUNNER=sandbox
+make docker-logs    STRATEGY=momentum
+make docker-stop    STRATEGY=momentum
+```
+
+Env file format (`~/zex/.momentum.env`):
+```bash
+FYERS_CLIENT_ID=...
+FYERS_SECRET_KEY=...
+FYERS_FY_ID=...
+FYERS_PIN=...
+FYERS_TOTP_SECRET=...
+MOMENTUM_PAPER_TRADE_SIZE_PCT=100
+```
+
 ## Dependencies
 
 [`nautilus-trader`](https://nautilustrader.io/) (event-driven backtest/live engine, pinned 1.226) ·
