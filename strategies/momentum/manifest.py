@@ -6,7 +6,7 @@ from core.manifest import KillCriterion, Manifest, Stage
 
 MANIFEST = Manifest(
     name="momentum",
-    stage=Stage.hypothesis,
+    stage=Stage.backtest,
     broker="fyers",
     # strategy_path="strategies.momentum.strategy:MomentumStrategy",  # once stage >= backtest
     universe=[],  # Nifty 500 — populated from registry
