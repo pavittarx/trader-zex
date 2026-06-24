@@ -1,7 +1,7 @@
 """Portfolio backtest of the PEAD rule — turns the per-event drift into a P&L
 stream with an equity curve, Sharpe, and drawdown.
 
-Rule (from PEAD_THESIS.md):
+Rule (from THESIS.md):
   - Event = earnings reaction day (t+1 after announcement), |reaction| >= thresh.
   - Enter at the reaction-day close: long if reaction up, short if down.
   - Hold H trading days, exit at close. Pay round-trip cost.

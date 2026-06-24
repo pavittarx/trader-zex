@@ -5,7 +5,7 @@ deploy it while it works and **pull the plug the moment it breaks, by pre-define
 rule, not gut feel.** This playbook locks the spec and the failure criteria *in
 advance* so the kill decision is mechanical.
 
-Basis: `PEAD_THESIS.md` — in-sample (one ~2yr regime) the lower-liquidity 20-day
+Basis: `THESIS.md` — in-sample (one ~2yr regime) the lower-liquidity 20-day
 form shows Sharpe ~1.3, maxDD −4%, net +1–2%/trade. NOT cross-regime validated.
 Treat every number below as a *prior to be confirmed forward*, not a promise.
 

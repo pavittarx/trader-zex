@@ -1,6 +1,6 @@
 """Generic kill-switch: pre-registered criteria evaluated over realized trades.
 
-Generalizes pead_core.kill_check (PEAD_PLAYBOOK.md kill-criteria) into a
+Generalizes pead_core.kill_check (strategies/pead/PLAYBOOK.md kill-criteria) into a
 registry so each strategy declares its own gates in its manifest:
 
     kill_criteria=[KillCriterion("drawdown", {"dd_limit": 0.08}),

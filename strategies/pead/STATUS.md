@@ -18,14 +18,14 @@ round-trip cost is amortized over a 20-day move rather than a daily rebalance.
 | 2026-06-01 | vectorized | Pooled IC(reaction, drift_20) positive; sign L/S t-stat significant |
 | 2026-06-03 | backtest | Portfolio backtest Sharpe ~1.1, shallow DD — but capacity test diluted to ~0.5 on broader universe |
 | 2026-06-05 | backtest | Liquidity-segmented: edge concentrates in low-liq tercile, Sharpe ~1.3 in-sample; NT strategy built (backtest/live parity) |
-| 2026-06-06 | sandbox | Promoted: spec + kill-criteria locked (PEAD_PLAYBOOK.md); awaiting sandbox infra |
+| 2026-06-06 | sandbox | Promoted: spec + kill-criteria locked (PLAYBOOK.md); awaiting sandbox infra |
 
 ## Findings log
 
 - Sharpe ~1.1 on the initial portfolio; dilutes to ~0.5 on the broader universe
   → capacity-limited, traded only in the locked low-liq list.
 - Fundamental-surprise variant (EPS-based) is NEGATIVE — the price reaction,
-  not the accounting surprise, carries the signal (PEAD_THESIS.md).
+  not the accounting surprise, carries the signal (THESIS.md).
 - In-sample = one ~2yr regime. NOT cross-regime validated. The forward sandbox
   run IS the out-of-sample test.
 - 2026-06-23: Added paper execution loop (`strategies/pead/paper.py`) compatible with `runners.paper`:

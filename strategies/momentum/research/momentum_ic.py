@@ -1,6 +1,6 @@
 """Cross-sectional momentum (trend-following) edge test for NSE equities.
 
-Edge hypothesis (see docs/MOMENTUM_THESIS.md): stocks that outperformed their
+Edge hypothesis (see THESIS.md): stocks that outperformed their
 peers over the past ~12 months (skipping the most recent month) keep
 outperforming next month, because investors underreact / anchor. Monthly
 rebalance => LOW turnover, so cost is paid rarely (the binding constraint).
@@ -70,7 +70,7 @@ def load_panel(symbols, years):
 # Alternative data source: public split-ADJUSTED NSE daily dataset on GitHub.
 # Real NIFTY500 daily Adj Close + Volume, 2012-2021 (Yahoo-derived). Used for
 # in-sample research when Fyers creds / a live data host are unreachable.
-# Results carry the dataset's window + survivorship caveats (MOMENTUM_THESIS §10).
+# Results carry the dataset's window + survivorship caveats (THESIS.md §10).
 # --------------------------------------------------------------------------- #
 GH_REPO = "Ratnesh-bhosale/NIFTY500_dataset"
 GH_RAW = f"https://raw.githubusercontent.com/{GH_REPO}/main/Dataset"

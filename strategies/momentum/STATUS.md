@@ -39,7 +39,7 @@ Nifty 500 constituents exhibit mean reversion on intra-month horizons but moment
 <<<<<<< HEAD
 - 2026-06-23: Independent cross-check on public split-adjusted GitHub NIFTY500 data
   (`strategies/momentum/research/momentum_ic.py`, self-test-verified harness;
-  full write-up in `docs/MOMENTUM_THESIS.md`). Corroborates a real but modest edge:
+  full write-up in `THESIS.md`). Corroborates a real but modest edge:
   full-universe pooled IC t 3.3, but ~40% is survivorship inflation — with a
   point-in-time top-200-by-liquidity universe (no look-ahead) IC t ~2.0, long-only
   alpha ~0.9%/mo (t 3.2) beyond beta, L/S net Sharpe ~0.5. Crash overlays

@@ -27,7 +27,7 @@ def kill_check(net_rets,
     """Evaluate the pre-registered kill-criteria on a sequence of net per-trade
     returns (chronological). Returns the tripped criterion string, or None.
 
-    Criteria (PEAD_PLAYBOOK.md §kill-criteria): equity drawdown, trailing-window
+    Criteria (PLAYBOOK.md §kill-criteria): equity drawdown, trailing-window
     mean <= 0, trailing-window win% < 45, realized mean > 2 SE below the prior.
     Same arithmetic as core.live.risk built from this manifest (test-pinned).
     """

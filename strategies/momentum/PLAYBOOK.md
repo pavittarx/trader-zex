@@ -11,7 +11,7 @@ Philosophy: test before deployment, then trust the mechanics. Pre-register all k
 - **Universe:** Nifty 500 constituents, point-in-time (use NSE constituent history, not current list)
 - **Ranking:** 12-month total return, excluding past 1 month
 - **Quintile:** Top 20% (approx. 100 stocks)
-- **Rebalance:** Every Friday EOD (3:30 PM IST)
+- **Rebalance:** Quarterly — 63-day cadence anchored to Friday EOD (3:30 PM IST)
 - **Position sizing:** Vol-weighted within quintile (optional; try equal-weight first)
 - **Turnover gate:** Only trade if portfolio weight drift > 1.5%
 - **Execution:** Next-day open or VWAP (backtest assumes next-day open at 09:15 IST)
@@ -145,5 +145,6 @@ Permanent alpha is rare; temporary alpha deployed systematically is the game.
 ## Related
 
 - [PIPELINE.md](../../docs/PIPELINE.md) — Full lifecycle
-- [PEAD_PLAYBOOK.md](../../docs/PEAD_PLAYBOOK.md) — Template (similar kill-criteria discipline)
+- [THESIS.md](THESIS.md) — Edge evidence + validation status
+- [pead/PLAYBOOK.md](../pead/PLAYBOOK.md) — Template (similar kill-criteria discipline)
 - [core.live.risk.py](../../core/live/risk.py) — Criterion registry (auto-enforced)

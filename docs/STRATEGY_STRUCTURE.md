@@ -12,6 +12,7 @@ strategies/<name>/
 ├── config.py                # Runtime config: reads env vars, provides defaults
 ├── .env.example             # Template for secrets + strategy-specific env vars
 ├── README.md                # Quick hypothesis + key params explained
+├── THESIS.md                # [optional] Deep edge/evidence write-up + validation status
 ├── PLAYBOOK.md              # Detailed kill-switch rules, deployment ladder
 ├── STATUS.md                # Stage history, findings, kill log (human narrative)
 ├── strategy.py              # NautilusTrader Strategy class (backtest + live)
@@ -103,9 +104,16 @@ STRATEGY_LOG_DIR=~/.trader_zex/logs/strategy/
 
 ## Documentation Files (Moderate or Heavy)
 
+### `THESIS.md` — Edge & Evidence (optional)
+
+The deep "why this makes money" write-up and validation status — the research
+narrative behind the one-paragraph hypothesis in README. Lives in the strategy
+folder (e.g. `strategies/pead/THESIS.md`), not centrally. README/PLAYBOOK link to
+it rather than restating it.
+
 ### `PLAYBOOK.md` — Operational Runbook
 
-Mirrors docs/PEAD_PLAYBOOK.md:
+Mirrors strategies/pead/PLAYBOOK.md:
 - The locked spec (do not tweak post-launch)
 - Expected behavior (the prior, OOS haircuts)
 - Pre-registered kill-criteria (mechanical, no overrides)
@@ -145,13 +153,17 @@ uv run python -m strategies.<name>.backtest --date-from 2015-01-01 --date-to 202
 - config.py loads defaults from manifest
 - No env vars needed
 
-### Paper Trade (secrets + 100% sizing)
+### Sandbox (secrets + 100% sizing) — NT `TradingNode`
 ```bash
 export $(cat ~/.env | xargs)
 uv run python -m runners.sandbox <name>
 ```
 - config.py loads manifest params + FYERS_* secrets + STRATEGY_PAPER_TRADE_SIZE_PCT=100
-- Same strategy.py code, live data + simulated fills
+- Same strategy.py code on an NT `TradingNode`: live Fyers data + NT
+  `SandboxExecutionClient` (paper fills) — identical engine to live, only the
+  execution client differs. See [ENVIRONMENTS.md](ENVIRONMENTS.md). (The legacy
+  `run_paper_cycle` batch behind this entry point is non-conforming interim
+  scaffolding, not the NT node.)
 
 ### Shadow Live (secrets + 10% sizing)
 ```bash
@@ -199,6 +211,6 @@ Each stage has gates (runners enforce them). Move only when evidence is strong.
 
 - [PIPELINE.md](../docs/PIPELINE.md) — Full lifecycle + gates
 - [STRATEGY_GUIDELINES.md](../docs/STRATEGY_GUIDELINES.md) — Research discipline
-- [PEAD_PLAYBOOK.md](../docs/PEAD_PLAYBOOK.md) — Template playbook
+- [strategies/pead/PLAYBOOK.md](../strategies/pead/PLAYBOOK.md) — Template playbook
 - [core.manifest.py](../core/manifest.py) — Stage + KillCriterion API
 - [core.live.risk.py](../core/live/risk.py) — Kill-criteria registry
