@@ -14,6 +14,9 @@
 > - Quarterly cadence reduces cost drag while retaining trend persistence
 > - Factor exposure (quality, low vol, size) drives the continuation
 
+Full edge write-up, survivorship correction, and validation status:
+[THESIS.md](THESIS.md).
+
 ---
 
 ## Edge & Failure Regimes
@@ -21,7 +24,7 @@
 | Factor | Benefit | Risk |
 |--------|---------|------|
 | **Lookback window (12-1 mo)** | Captures multi-month trends, captures factor exposure | Sharp V-reversals in a single month kills the rank; crowded trades reverse faster |
-| **Weekly rebalance** | Fresh signal weekly, avoids stale ranks | Execution friction; costs eat the edge if turnover spikes |
+| **Quarterly rebalance** | Low turnover keeps costs below the edge | Staler ranks; slower to exit a position that has rolled over |
 | **Turnover filter** | Throttles rebalancing churn (only trade if drift > 1.5%) | Misses regime transitions; delayed entry/exit on sharp gaps |
 | **Top quintile (long only)** | High conviction, lower execution costs than L/S | Missing short edge; unidirectional bet (fails in downturns) |
 
@@ -70,7 +73,7 @@ uv run python -m strategies.momentum.research.universe_registry isins-at-date --
 
 1. **Load EOD data** (Fyers API, cached in Parquet)
 2. **Compute 12-1 returns** (expanding window, no look-ahead)
-3. **Rank weekly** (Friday) → select top quintile
+3. **Rank each rebalance** (quarterly, Friday-anchored) → select top quintile
 4. **Compute rebalance trades** (vs current portfolio)
 5. **Filter by turnover gate** (drop trades if total drift < 1.5%)
 6. **Execute at next-day VWAP** (realistic fill model)
@@ -80,17 +83,22 @@ uv run python -m strategies.momentum.research.universe_registry isins-at-date --
 
 ## Deployment
 
-### Paper trade (1–3 months)
-- Live Fyers EOD feed → quarterly signal compute
-- Simulate fills at next-day VWAP
-- Monitor realized costs, win rate, drawdown
-- **Gate:** metrics match backtest prior ±1 SE
+### Sandbox forward-test (1–3 months) — NT `TradingNode`
 
-Run one paper cycle:
+Runs through the NautilusTrader sandbox node (live Fyers data + NT
+`SandboxExecutionClient`) — the *same* node that trades live, so forward-test
+results are promotion-grade. See [ENVIRONMENTS.md](../../docs/ENVIRONMENTS.md).
+Entry point once the node is built:
 
 ```bash
-uv run python -m runners.paper momentum --as-of 2024-06-28 --n-symbols 50
+uv run python -m runners.sandbox momentum
 ```
+
+- **Gate:** metrics match the backtest prior ±1 SE.
+
+> `runners.paper` / `run_paper_cycle` is a non-conforming EOD batch (custom fill
+> sim, not NT) kept only as interim scaffolding — its numbers do **not** satisfy
+> the sandbox gate.
 
 ### Shadow live (1–3 months)
 - Place 10% position sizing in live market
@@ -100,7 +108,8 @@ uv run python -m runners.paper momentum --as-of 2024-06-28 --n-symbols 50
 
 ### Full live
 - **Gate:** Shadow trade metrics match backtest
-- Auto-rebalance every Friday 3:30 PM IST
+- The NT `TradingNode` rebalances on bar-close internally (no external cron) —
+  weekly cadence is the strategy's own logic, not a scheduler
 - **Kill-switch:** drawdown > 15%, slippage > 2× model, stale feed, win rate < 45%
 
 ---
@@ -115,6 +124,7 @@ uv run python -m runners.paper momentum --as-of 2024-06-28 --n-symbols 50
 | `strategy.py` | NautilusTrader Strategy class (backtest + live) |
 | `backtest.py` | Runner entry point (calls core.backtest.engine) |
 | `research/README.md` | Research script map (triage, walk-forward, verification, experiments) |
+| `THESIS.md` | Edge evidence, survivorship correction, validation status |
 | `PLAYBOOK.md` | Detailed position sizing, kill-switch rules, OOS interpretation |
 | `STATUS.md` | Stage history, findings log, kill log (updated per phase) |
 
@@ -123,7 +133,7 @@ uv run python -m runners.paper momentum --as-of 2024-06-28 --n-symbols 50
 ## References
 
 - [PIPELINE.md](../../docs/PIPELINE.md) — Stage gates + lifecycle
-- [PEAD_PLAYBOOK.md](../../docs/PEAD_PLAYBOOK.md) — Deployment ladder (apply same pattern)
+- [pead/PLAYBOOK.md](../pead/PLAYBOOK.md) — Deployment ladder (apply same pattern)
 - [core.backtest.engine](../../core/backtest/engine.py) — Backtest harness (NautilusTrader)
 - [core.research.stats](../../core/research/stats.py) — Sharpe, IC, max-DD metrics
 - [core.research.cost](../../core/research/cost.py) — Cost models (bps → fractions)

@@ -148,128 +148,96 @@ WantedBy=timers.target
 EOF
 ```
 
-### 7.2 Weekly momentum paper rebalance service + timer
+### 7.2 Strategy trading — a long-running NT `TradingNode` service
 
-Use paper until the strategy is promoted to sandbox/live.
+> **Architecture rule: trading runs as a NautilusTrader `TradingNode`, never a
+> cron/timer batch.** Sandbox and live are the *same* NT node (only the execution
+> client differs), so what you forward-test is what you trade — see
+> [ENVIRONMENTS.md](ENVIRONMENTS.md). The node owns market-hours scheduling and
+> bar-event timing **internally**; no systemd timer decides when to trade. The
+> only timer on the box is the infra auth refresh in §7.1.
+>
+> **⚠️ BLOCKED — not runnable yet.** The Fyers NT `DataClient` + sandbox/live
+> `TradingNode` are **not built** (see the ENVIRONMENTS.md build order). Do **not**
+> substitute `runners.paper` / `runners.sandbox` (the `run_paper_cycle` EOD batch)
+> here — that path is non-conforming, its fills don't match live, and its output
+> is not promotion-grade. There is currently **no conforming way to run a strategy
+> unattended on EC2**; the auth timer (§7.1) is the only thing to enable now. When
+> the node lands, deploy it with the service template below.
 
 ```bash
-sudo tee /etc/systemd/system/trader-zex-momentum-paper.service > /dev/null << 'EOF'
+# TEMPLATE — install only once strategies/<name>/sandbox.py builds a real NT node.
+sudo tee /etc/systemd/system/trader-zex-pead.service > /dev/null << 'EOF'
 [Unit]
-Description=Trader Zex momentum weekly paper cycle
+Description=Trader Zex PEAD sandbox TradingNode
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=oneshot
+Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/apps/trader-zex
 EnvironmentFile=/home/ubuntu/apps/trader-zex/.env.runtime
-ExecStart=/bin/bash -lc 'set -a && source /home/ubuntu/.env && set +a && uv run python -m runners.paper momentum --n-symbols 100 --lookback-days 900'
-EOF
-
-sudo tee /etc/systemd/system/trader-zex-momentum-paper.timer > /dev/null << 'EOF'
-[Unit]
-Description=Run momentum paper weekly (Friday 15:30 IST)
-
-[Timer]
-OnCalendar=Fri *-*-* 15:30:00 Asia/Kolkata
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-```
-
-### 7.3 Optional PEAD sandbox daily service + timer
-
-Use this only while `pead` is at `sandbox` stage.
-
-```bash
-sudo tee /etc/systemd/system/trader-zex-pead-sandbox.service > /dev/null << 'EOF'
-[Unit]
-Description=Trader Zex PEAD sandbox cycle
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-User=ubuntu
-WorkingDirectory=/home/ubuntu/apps/trader-zex
-EnvironmentFile=/home/ubuntu/apps/trader-zex/.env.runtime
+# The NT node runs continuously and acts on bar-close events; it does NOT exit
+# after one cycle. Restart on crash; the node reconciles state on startup.
 ExecStart=/bin/bash -lc 'set -a && source /home/ubuntu/.env && set +a && uv run python -m runners.sandbox pead'
+Restart=on-failure
+RestartSec=30
 EOF
 
-sudo tee /etc/systemd/system/trader-zex-pead-sandbox.timer > /dev/null << 'EOF'
-[Unit]
-Description=Run PEAD sandbox daily (EOD)
-
-[Timer]
-OnCalendar=Mon..Fri *-*-* 15:45:00 Asia/Kolkata
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-```
-
-Enable timers:
-
-```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now trader-zex-auth.timer
-sudo systemctl enable --now trader-zex-momentum-paper.timer
-# optional
-sudo systemctl enable --now trader-zex-pead-sandbox.timer
+# trader-zex-pead.service — enable ONLY after the NT node is built:
+# sudo systemctl enable --now trader-zex-pead.service
 ```
+
+If you want the node up only during market hours instead of 24/7, bound it with a
+start/stop pair of timers (`OnCalendar=Mon..Fri 09:00 Asia/Kolkata` →
+`systemctl start`, `15:45` → `systemctl stop`). That is infra lifecycle, not a
+trading reimplementation — the trade decisions still happen inside the NT node.
 
 ## 8) Manual trigger and health checks
 
 ```bash
-# Trigger now
+# Infra: refresh the token now
 sudo systemctl start trader-zex-auth.service
-sudo systemctl start trader-zex-momentum-paper.service
 
 # Timer/service status
 systemctl list-timers --all | grep trader-zex
-systemctl status trader-zex-momentum-paper.service --no-pager
+sudo systemctl status trader-zex-pead.service --no-pager   # once the node exists
 ```
 
 ## 9) Where logs go
 
-- **Systemd stdout/stderr**
-  - `journalctl -u trader-zex-momentum-paper.service -n 200 --no-pager`
-  - `journalctl -u trader-zex-pead-sandbox.service -n 200 --no-pager`
-- **Shared structured observer (JSONL fallback)**
-  - `~/.trader_zex/logs/sandbox/shared_session.jsonl`
-- **Strategy logs/state**
+- **Systemd stdout/stderr** (NT node + auth)
+  - `journalctl -u trader-zex-pead.service -n 200 --no-pager`
+  - `journalctl -u trader-zex-auth.service -n 200 --no-pager`
+- **NT node logs / strategy state**
   - `~/.trader_zex/logs/`
-  - `~/.trader_zex/state/`
+  - `~/.trader_zex/state/` (kill-switch halt state)
 
 ## 10) Parseable UI usage (log visibility)
 
 1. Open `http://<EC2_PUBLIC_IP>:8000`.
-2. Select stream `trader_zex_sandbox`.
-3. Filter by `kind` values:
-   - `market_client_started`
-   - `shared_session_started`
-   - `sandbox_heartbeat`
-   - `sandbox_fill`
-   - `strategy_cycle`
-4. Save a query/view for:
-   - latest strategy cycles
-   - fill events
-   - heartbeat continuity
+2. Select the stream the NT node ships to (configure the node's logger/observer
+   to POST to Parseable, or ingest journald via a shipper).
+3. Save views for order/fill events, position changes, and any kill-switch halt.
+
+> The `kind` values previously listed here (`sandbox_heartbeat`, `sandbox_fill`,
+> `strategy_cycle`, …) were emitted by the interim `run_paper_cycle` observer,
+> which is non-conforming and slated for removal (see ENVIRONMENTS.md). The NT
+> `TradingNode` logs through NT's own logger — wire that to Parseable instead.
 
 ## 11) Minimal rollback and recovery
 
 ```bash
-# Stop automation only
-sudo systemctl disable --now trader-zex-momentum-paper.timer
-sudo systemctl disable --now trader-zex-pead-sandbox.timer
+# Stop the trading node (kill-switch state in ~/.trader_zex/state/ persists;
+# open positions run to their in-strategy stop/hold exit)
+sudo systemctl disable --now trader-zex-pead.service
 
-# Keep auth timer if needed
+# Keep the infra auth timer running
 sudo systemctl status trader-zex-auth.timer --no-pager
 ```
 
-If Parseable is down, Trader Zex keeps local JSONL logs and resumes remote
-delivery when Parseable is back.
+If Parseable is down, Trader Zex keeps local logs and resumes remote delivery
+when Parseable is back.

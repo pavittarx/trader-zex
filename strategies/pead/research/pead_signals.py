@@ -1,7 +1,7 @@
 """Daily PEAD signal generator + kill-switch monitor (paper/live deployment).
 
 `signals` mode: as of a date, scan the universe for earnings reactions and print
-the actions implied by the locked spec (PEAD_PLAYBOOK.md):
+the actions implied by the locked spec (PLAYBOOK.md):
   ENTER TODAY  — reaction landed today (|reaction|>=2%): open at the close.
   HOLDING      — in the 20-day window: keep.
   EXIT TODAY   — 20 sessions since reaction: close.

@@ -1,6 +1,6 @@
 """PEAD (post-earnings announcement drift) — manifest.
 
-The locked spec from docs/PEAD_PLAYBOOK.md. Do NOT tweak params once live;
+The locked spec from PLAYBOOK.md. Do NOT tweak params once live;
 tweaking = a new in-sample fit and restarts the validation clock.
 """
 from core.manifest import KillCriterion, Manifest, Stage
@@ -12,7 +12,7 @@ MANIFEST = Manifest(
     strategy_path="strategies.pead.strategy:PEADStrategy",
     config_path="strategies.pead.strategy:PEADStrategyConfig",
     # Locked lower-liquidity universe (the segment where the edge concentrated,
-    # PEAD_THESIS.md §9-10). Fixed at launch; no mid-flight additions.
+    # THESIS.md §9-10). Fixed at launch; no mid-flight additions.
     universe=[
         "NSE:SAIL-EQ", "NSE:NMDC-EQ", "NSE:PNB-EQ", "NSE:CANBK-EQ", "NSE:ASHOKLEY-EQ",
         "NSE:BANKBARODA-EQ", "NSE:HINDPETRO-EQ", "NSE:GAIL-EQ", "NSE:NATIONALUM-EQ",
@@ -27,7 +27,7 @@ MANIFEST = Manifest(
         max_gross=0.90,        # portfolio gross-exposure cap
         leg_bps=15.0,          # cost per leg (entry, exit), bps
     ),
-    # Pre-registered (PEAD_PLAYBOOK.md §kill-criteria). Mechanical, no overrides.
+    # Pre-registered (PLAYBOOK.md §kill-criteria). Mechanical, no overrides.
     kill_criteria=[
         KillCriterion("drawdown", {"dd_limit": 0.08}),
         KillCriterion("trailing_mean", {"window": 20}),

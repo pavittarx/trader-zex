@@ -268,7 +268,7 @@ MOMENTUM_PAPER_TRADE_SIZE_PCT=10 uv run python -m runners.sandbox momentum
 - [docs/STRATEGY_STRUCTURE.md](docs/STRATEGY_STRUCTURE.md) — How to add a new strategy
 - [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md) — Backtest/sandbox/live architecture
 - [docs/STRATEGY_GUIDELINES.md](docs/STRATEGY_GUIDELINES.md) — Research discipline (hypothesis → IC → OOS)
-- [docs/PEAD_PLAYBOOK.md](docs/PEAD_PLAYBOOK.md) — Deployment runbook (apply pattern to any strategy)
+- [strategies/pead/PLAYBOOK.md](strategies/pead/PLAYBOOK.md) — Deployment runbook (apply pattern to any strategy)
 - [strategies/momentum/README.md](strategies/momentum/README.md) — Momentum hypothesis + params
 - [strategies/momentum/PLAYBOOK.md](strategies/momentum/PLAYBOOK.md) — Momentum deployment rules + kill-switch criteria
 - [strategies/pead/STATUS.md](strategies/pead/STATUS.md) — PEAD findings log + stage history

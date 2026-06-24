@@ -3,7 +3,7 @@
 One instance per symbol. Daily bars. The SAME class runs in the BacktestEngine
 and (later) a live/sandbox TradingNode, so backtest and live share one codepath.
 
-Rules (PEAD_PLAYBOOK.md) + risk guards:
+Rules (PLAYBOOK.md) + risk guards:
   ENTRY  : flat, today is this symbol's earnings reaction day, reaction >= +2%
            (long-only — shorts need F&O). Size = alloc_pct of equity, capped by
            a portfolio gross-exposure limit.
